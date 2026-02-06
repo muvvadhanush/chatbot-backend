@@ -6,18 +6,10 @@
   }
 
   // Determine Base URL (Config > Script Origin > Default)
-  let baseUrl = config.apiUrl;
+  let baseUrl = config.apiUrl || config.backendUrl; // Support both keys
   if (!baseUrl) {
-    // Try to guess from the script src if possible, otherwise default to origin or localhost for dev
-    // For now, we'll default to the current origin if not specified, assuming widget is hosted with backend
-    // Or fallback to localhost if we are just a file
-    baseUrl = window.location.origin.includes('http') ? window.location.origin : 'http://localhost:5001';
-
-    // If widget is embedded on a 3rd party site, they MUST provide apiUrl or we default to a known public backend URL.
-    // Since we don't have a public URL yet, we warn.
-    if (baseUrl === 'null' || baseUrl === 'file://') {
-      baseUrl = 'http://localhost:5001';
-    }
+    // Fallback to AWS EC2 Production IP
+    baseUrl = 'http://13.48.43.200';
   }
   // Remove trailing slash if present
   baseUrl = baseUrl.replace(/\/$/, "");

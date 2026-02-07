@@ -136,7 +136,43 @@ const Connection = sequelize.define("Connection", {
     type: DataTypes.JSON,
     defaultValue: [], // Array of { match: "/path", overrides: {} }
     comment: "Page-level rules that override the global behavior profile"
-  }
+  },
+  // --- Phase 1: Secure Handshake & Extraction ---
+  passwordHash: {
+    type: DataTypes.STRING,
+    allowNull: true, // Transitioning existing connections
+  },
+
+  status: {
+    type: DataTypes.ENUM('CREATED', 'CONNECTED', 'EXTRACTION_REQUESTED', 'READY', 'FAILED'),
+    defaultValue: 'CREATED'
+  },
+
+  widgetSeen: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+
+  extractionEnabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+
+  allowedExtractors: {
+    type: DataTypes.JSON, // ["branding", "knowledge", "forms"]
+    defaultValue: []
+  },
+
+  extractionToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+
+  extractionTokenExpires: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  // --- End Phase 1 ---
 });
 
 module.exports = Connection;

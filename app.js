@@ -21,6 +21,7 @@ const cors = require("cors");
 const sequelize = require("./config/db");
 const chatRoutes = require("./routes/chatRoutes");
 const connectionRoutes = require("./routes/connectionRoutes");
+const widgetRoutes = require("./routes/widgetRoutes");
 const Idea = require("./models/Idea");
 const Connection = require("./models/Connection");
 const ConnectionKnowledge = require("./models/ConnectionKnowledge");
@@ -78,6 +79,7 @@ app.get("/", (req, res) => {
 // ROUTES
 app.use("/api/chat", chatRoutes);
 app.use("/api/connections", connectionRoutes);
+app.use("/api/widget", widgetRoutes);
 console.log("🔄 Mounting /api/v1/ideas...");
 app.use("/api/v1/ideas", require("./routes/ideaRoutes"));
 

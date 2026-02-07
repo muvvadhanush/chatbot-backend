@@ -1,4 +1,6 @@
 const express = require("express");
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const sequelize = require("../config/db");
 const router = express.Router();
 const Connection = require("../models/Connection");
@@ -11,6 +13,14 @@ console.log("🔥 connectionRoutes.js LOADED");
 // Create a new connection
 router.post("/create", async (req, res) => {
   try {
+    // Phase 1: Secure Creation
+    if (req.body.password) {
+      req.body.passwordHash = await bcrypt.hash(req.body.password, 10);
+      delete req.body.password;
+    }
+
+    req.body.status = "CREATED"; // Enforce default
+
     const connection = await Connection.create(req.body);
     res.json(connection);
   } catch (error) {
@@ -445,6 +455,60 @@ router.delete("/:connectionId", async (req, res) => {
     }
     await connection.destroy();
     res.json({ success: true, message: "Connection deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 1: Admin Extraction Controls ---
+
+// 1.3 Admin Enable Extraction
+router.post("/:connectionId/extraction/enable", async (req, res) => {
+  try {
+    const { connectionId } = req.params;
+    const { allowedExtractors } = req.body;
+
+    const connection = await Connection.findOne({ where: { connectionId } });
+    if (!connection) return res.status(404).json({ error: "Connection not found" });
+
+    // Ensure widget is connected first
+    if (!connection.widgetSeen) {
+      return res.status(400).json({ error: "Widget has not connected yet." });
+    }
+
+    connection.extractionEnabled = true;
+    connection.allowedExtractors = allowedExtractors || ["branding", "knowledge", "forms"];
+    await connection.save();
+
+    res.json({ success: true, message: "Extraction enabled" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.4 Admin Trigger Extraction
+router.post("/:connectionId/extract", async (req, res) => {
+  try {
+    const { connectionId } = req.params;
+
+    const connection = await Connection.findOne({ where: { connectionId } });
+    if (!connection) return res.status(404).json({ error: "Connection not found" });
+
+    if (!connection.extractionEnabled) {
+      return res.status(403).json({ error: "Extraction not enabled for this connection" });
+    }
+
+    // Generate Token
+    // Using built-in crypto
+    const token = crypto.randomBytes(16).toString("hex");
+    connection.extractionToken = token;
+    // 10 mins expiry
+    connection.extractionTokenExpires = new Date(Date.now() + 10 * 60 * 1000);
+    connection.status = "EXTRACTION_REQUESTED";
+    await connection.save();
+
+    res.json({ success: true, token, message: "Extraction requested" });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

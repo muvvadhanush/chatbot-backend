@@ -1,4 +1,5 @@
 const express = require("express");
+const sequelize = require("../config/db");
 const router = express.Router();
 const Connection = require("../models/Connection");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
@@ -367,7 +368,22 @@ router.get("/list", async (req, res) => {
     });
     res.json(connections);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("❌ [/list] ERROR:", error);
+
+    // Auto-diagnostic
+    let tableInfo = "Could not describe table";
+    try {
+      tableInfo = await sequelize.getQueryInterface().describeTable("Connections");
+    } catch (dErr) {
+      tableInfo = "Error describing table: " + dErr.message;
+    }
+
+    res.status(500).json({
+      error: error.message,
+      hint: "Check if all required columns exist in the database.",
+      tableInfo: tableInfo,
+      stack: error.stack
+    });
   }
 });
 

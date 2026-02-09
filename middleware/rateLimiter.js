@@ -12,6 +12,7 @@ const createLimiter = (windowMs, max, message) => {
         message,
         standardHeaders: true,
         legacyHeaders: false,
+        // Do NOT use custom keyGenerator - let express-rate-limit handle IPv6 automatically
         handler: (req, res) => {
             logger.warn(`Rate limit exceeded`, {
                 ip: req.ip,
@@ -19,10 +20,6 @@ const createLimiter = (windowMs, max, message) => {
                 requestId: req.requestId
             });
             res.status(429).json({ error: message });
-        },
-        keyGenerator: (req) => {
-            // Use req.ip for IPv4/IPv6 compatibility
-            return req.ip;
         }
     });
 };

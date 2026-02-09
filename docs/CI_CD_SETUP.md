@@ -28,7 +28,7 @@ Go to **Settings** > **Secrets and variables** > **Actions** > **New repository 
 Add the following 3 secrets:
 
 ### `EC2_HOST`
-`13.48.43.200`
+`16.171.152.146`
 
 ### `EC2_USER`
 `deploy`

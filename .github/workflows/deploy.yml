@@ -13,15 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug secrets
-        run: |
-          if [ -z "${{ secrets.EC2_HOST }}" ]; then
-            echo "EC2_HOST is EMPTY"
-            exit 1
-          else
-            echo "EC2_HOST is SET"
-          fi
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:

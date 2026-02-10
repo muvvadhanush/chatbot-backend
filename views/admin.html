@@ -4,413 +4,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal AI Chatbot Admin</title>
+    <title>Universal AI Admin</title>
     <link rel="stylesheet" href="admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Phase 11 Styles */
-        .modal-content.large {
-            max-width: 800px;
-        }
-
-        .tabs {
-            display: flex;
-            border-bottom: 2px solid var(--border);
-            margin-bottom: 20px;
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 1rem;
-            color: var(--text-color);
-            border-bottom: 2px solid transparent;
-        }
-
-        .tab-btn.active {
-            border-bottom: 2px solid var(--primary);
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
-
-        .section-box {
-            border: 1px solid var(--border);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            background: var(--card-bg);
-        }
-
-        .section-box h3 {
-            margin-top: 0;
-            font-size: 1.1em;
-            color: var(--text-color);
-            margin-bottom: 15px;
-        }
-
-        .branding-preview {
-            display: flex;
-            align-items: center;
-            gap: 30px;
-        }
-
-        .branding-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .preview-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-            object-fit: contain;
-        }
-
-        .preview-logo {
-            width: 100px;
-            height: 50px;
-            object-fit: contain;
-            background: #eee;
-            padding: 5px;
-            border-radius: 4px;
-        }
-
-        .no-preview {
-            color: #888;
-            font-size: 0.8rem;
-            font-style: italic;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: #eee;
-            color: #555;
-        }
-
-        .add-knowledge-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .knowledge-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-
-        .knowledge-table th,
-        .knowledge-table td {
-            text-align: left;
-            padding: 8px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .knowledge-table th {
-            background: var(--bg-color);
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-    </style>
 </head>
 
 <body>
     <div class="container">
+        <!-- Header -->
         <header>
-            <h1>🤖 Universal AI Chatbot Admin</h1>
+            <h1>
+                <span class="logo-icon">🤖</span>
+                Universal AI Chatbot Admin
+            </h1>
             <div class="header-actions">
                 <div id="healthStatus" class="health-status">
                     <span class="dot"></span>
                     <span class="status-text">Checking...</span>
                 </div>
-                <button id="themeToggle" class="theme-toggle" aria-label="Toggle Theme">
-                    <span class="icon">🌓</span>
+                <!-- Theme Toggle -->
+                <button id="themeToggle" class="btn secondary icon-only" title="Toggle Theme">
+                    <span>☀</span>
                 </button>
                 <button id="newConnectionBtn" class="btn primary">
-                    <span class="icon">+</span> New Connection
+                    <span>+</span> New Connection
                 </button>
             </div>
         </header>
 
+        <!-- Main Content -->
         <main>
-            <section id="connectionsList" class="connections-grid">
-                <!-- Connections will be loaded here -->
+            <div id="connectionsList" class="connections-grid">
+                <!-- Cards will be injected here -->
                 <div class="loading">Loading connections...</div>
-            </section>
+            </div>
         </main>
+    </div>
 
-        <!-- Manage Connection Modal -->
-        <div id="connectionModal" class="modal hidden">
-            <div class="modal-content large">
-                <div class="modal-header">
-                    <h2 id="modalTitle">Manage Connection</h2>
-                    <button class="close-btn">&times;</button>
+    <!-- Wizard Modal -->
+    <div id="connectionWizard" class="modal">
+        <div class="wizard-container">
+            <!-- Header (Steps) -->
+            <div class="wizard-steps">
+                <div class="step active" data-step="1">
+                    <div class="step-circle">1</div>
+                    <span>Identity</span>
                 </div>
+                <div class="step" data-step="2">
+                    <div class="step-circle">2</div>
+                    <span>Knowledge</span>
+                </div>
+                <div class="step" data-step="3">
+                    <div class="step-circle">3</div>
+                    <span>Behavior</span>
+                </div>
+                <div class="step" data-step="4">
+                    <div class="step-circle">4</div>
+                    <span>Deployment</span>
+                </div>
+            </div>
 
-                <div class="modal-body">
-                    <!-- Tabs -->
-                    <div class="tabs">
-                        <button class="tab-btn active" data-tab="tab-general">General</button>
-                        <button class="tab-btn" data-tab="tab-behavior">🧠 Behavior</button>
-                        <button class="tab-btn" data-tab="tab-knowledge">Knowledge & Branding</button>
-                        <button class="tab-btn" data-tab="tab-reviews">Reviews (Pending)</button>
-                    </div>
+            <!-- Content -->
+            <div class="wizard-content">
+                <form id="wizardForm">
+                    <input type="hidden" id="connId">
+                    <input type="hidden" id="connectionSecret" value="generated_secret_should_be_dynamic">
 
-                    <!-- General Tab -->
-                    <!-- ... -->
-
-                    <!-- General Tab -->
-                    <div id="tab-general" class="tab-content active">
-                        <form id="connectionForm">
-                            <input type="hidden" id="connId">
-
-                            <div class="row">
-                                <div class="form-group half">
-                                    <label for="connectionId">Connection ID <span class="required">*</span></label>
-                                    <input type="text" id="connectionId" required placeholder="e.g. shop_v1">
+                    <!-- STEP 1: IDENTITY -->
+                    <div class="step-panel active" id="step1">
+                        <div class="panel-header">
+                            <h3>New Connection: Identity Setup</h3>
+                            <p>Define the identity and basic details of your AI assistant.</p>
+                        </div>
+                        <div class="row" style="display: flex; gap: 2rem;">
+                            <div style="flex: 1;">
+                                <div class="form-group">
+                                    <label>Connection ID (Unique)</label>
+                                    <input type="text" id="connectionId" placeholder="e.g. shop_v2" required>
                                 </div>
-                                <div class="form-group half">
-                                    <label for="connectionSecret">Secret Key <span class="required">*</span></label>
-                                    <input type="text" id="connectionSecret" required value="secret123">
+                                <div class="form-group">
+                                    <label>Website Name</label>
+                                    <input type="text" id="websiteName" placeholder="e.g. Acme Corp">
                                 </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="form-group half">
-                                    <label for="websiteName">Website Name</label>
-                                    <input type="text" id="websiteName" placeholder="My Awesome Shop">
-                                </div>
-                                <div class="form-group half">
-                                    <label for="assistantName">Bot Name</label>
-                                    <input type="text" id="assistantName" placeholder="ShopBot">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="urlInput">Auto-Extract (Scrapes URL for settings)</label>
-                                <div class="input-group">
-                                    <input type="url" id="urlInput" placeholder="https://example.com">
-                                    <button type="button" id="extractBtn" class="btn secondary">Auto-Extract</button>
+                                <div class="form-group">
+                                    <label>Website URL</label>
+                                    <input type="url" id="websiteUrl" placeholder="https://www.example.com">
                                 </div>
                             </div>
-
-                            <div class="form-group">
-                                <label for="welcomeMessage">Welcome Message</label>
-                                <input type="text" id="welcomeMessage" placeholder="Hi! How can I help?">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="tone">Tone/Personality</label>
-                                <input type="text" id="tone" placeholder="Professional, friendly, witty...">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="allowedDomains">Allowed Domains</label>
-                                <input type="text" id="allowedDomains" placeholder="http://localhost:3000">
-                            </div>
-
-                            <div class="modal-actions">
-                                <button type="button" class="btn text close-btn">Cancel</button>
-                                <button type="submit" class="btn primary">Save Connection</button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Behavior Tab -->
-                    <div id="tab-behavior" class="tab-content">
-                        <div class="section-box">
-                            <h3>🧠 Website Behavior Profile</h3>
-                            <div class="row">
-                                <div class="form-group half">
-                                    <label for="assistantRole">Assistant Role</label>
-                                    <select id="assistantRole">
-                                        <option value="sales_assistant">Sales Assistant</option>
-                                        <option value="support_agent">Support Agent</option>
-                                        <option value="guide">Guide</option>
-                                    </select>
-                                </div>
-                                <div class="form-group half">
-                                    <label for="behaviorTone">Tone</label>
-                                    <select id="behaviorTone">
-                                        <option value="friendly">Friendly</option>
-                                        <option value="formal">Formal</option>
-                                        <option value="neutral">Neutral</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="form-group half">
-                                    <label for="responseLength">Response Length</label>
-                                    <select id="responseLength">
-                                        <option value="short">Short</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="long">Long</option>
-                                    </select>
-                                </div>
-                                <div class="form-group half">
-                                    <label for="primaryGoal">Primary Goal</label>
-                                    <select id="primaryGoal">
-                                        <option value="convert">Convert</option>
-                                        <option value="support">Support</option>
-                                        <option value="educate">Educate</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="salesIntensity">Sales Intensity (0.0 - 1.0)</label>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="range" id="salesIntensity" min="0" max="100" value="0"
-                                        style="flex-grow: 1;">
-                                    <span id="salesVal">0.0</span>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="empathyLevel">Empathy Level (0.0 - 1.0)</label>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="range" id="empathyLevel" min="0" max="100" value="50"
-                                        style="flex-grow: 1;">
-                                    <span id="empathyVal">0.5</span>
+                            <div style="width: 250px;">
+                                <label>AI Avatar</label>
+                                <div class="avatar-upload-box"
+                                    style="background: var(--input-bg); border: 2px dashed var(--border); border-radius: 12px; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
+                                    <div class="robot-avatar" style="width: 80px; height: 80px; font-size: 2.5rem;">🤖
+                                    </div>
+                                    <span style="font-size: 0.85rem; color: var(--primary);">Upload or Select</span>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="section-box">
-                            <h3>🔗 Page-Level Overrides</h3>
-                            <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">Define rules for specific
-                                URLs (e.g. /pricing).</p>
-                            <div id="overridesList">
-                                <!-- Rules added here -->
+                    <!-- STEP 2: KNOWLEDGE -->
+                    <div class="step-panel" id="step2">
+                        <div class="panel-header">
+                            <h3>Knowledge Base</h3>
+                            <p>Train your AI with content from your website or docs.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Auto-Extract Content</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="extractUrl" placeholder="https://example.com/docs">
+                                <button type="button" id="autoExtractBtn" class="btn secondary">Start
+                                    Extraction</button>
                             </div>
-                            <button type="button" class="btn secondary small" id="addOverrideBtn">+ Add Rule</button>
+                            <small>We will assume the URL provided in Step 1 if left empty.</small>
+                        </div>
+
+                        <div class="divider" style="margin: 2rem 0; border-top: 1px solid var(--border);"></div>
+
+                        <div class="form-group">
+                            <label>Branding Detection</label>
+                            <div style="display: flex; gap: 20px; align-items: center;">
+                                <div id="detectedFavicon"
+                                    style="width: 40px; height: 40px; background: #333; border-radius: 8px;"></div>
+                                <span>Favicon Detected</span>
+                                <button type="button" id="refetchBrandingBtn" class="btn text small">Refetch</button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Knowledge & Branding Tab -->
-                    <div id="tab-knowledge" class="tab-content">
-
-                        <!-- Branding Section -->
-                        <div class="section-box">
-                            <h3>🎨 Branding</h3>
-                            <div class="branding-preview">
-                                <div class="branding-item">
-                                    <span class="label-text">Favicon</span>
-                                    <img id="previewFavicon" src="" class="preview-icon hidden">
-                                    <div id="noFavicon" class="no-preview">No Favicon</div>
+                    <!-- STEP 3: BEHAVIOR -->
+                    <div class="step-panel" id="step3">
+                        <div class="deep-control-layout">
+                            <!-- Left: Sliders -->
+                            <div class="behavior-panel">
+                                <div class="panel-header">
+                                    <h3>AI Behavior Configuration</h3>
                                 </div>
-                                <div class="branding-item">
-                                    <span class="label-text">Logo</span>
-                                    <img id="previewLogo" src="" class="preview-logo hidden">
-                                    <div id="noLogo" class="no-preview">No Logo</div>
+
+                                <div class="slider-group">
+                                    <div class="slider-header">
+                                        <label>Formality</label>
+                                        <span class="badge" id="formalityVal">Casual</span>
+                                    </div>
+                                    <input type="range" id="formalitySlider" min="0" max="100" value="20">
+                                    <div class="slider-labels">
+                                        <span>Casual</span>
+                                        <span>Professional</span>
+                                    </div>
                                 </div>
-                                <div class="branding-actions">
-                                    <div class="status-badge" id="brandingStatusBadge">PENDING</div>
-                                    <button type="button" id="fetchBrandingBtn" class="btn secondary small">Refetch
-                                        Branding</button>
+
+                                <div class="slider-group">
+                                    <div class="slider-header">
+                                        <label>Empathy</label>
+                                        <span class="badge" id="empathyVal">High</span>
+                                    </div>
+                                    <input type="range" id="empathySlider" min="0" max="100" value="80">
+                                    <div class="slider-labels">
+                                        <span>None</span>
+                                        <span>Therapist</span>
+                                    </div>
+                                </div>
+
+                                <div class="slider-group">
+                                    <div class="slider-header">
+                                        <label>Sales Intensity</label>
+                                        <span class="badge" id="salesVal">Soft</span>
+                                    </div>
+                                    <input type="range" id="salesSlider" min="0" max="100" value="40">
+                                    <div class="slider-labels">
+                                        <span>Info Only</span>
+                                        <span>Aggressive</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <hr>
-
-                        <!-- Knowledge Section -->
-                        <div class="section-box">
-                            <h3>📚 Knowledge Base</h3>
-
-                            <!-- Add Knowledge -->
-                            <div class="add-knowledge-box">
-                                <select id="ingestType">
-                                    <option value="URL">URL</option>
-                                    <option value="TEXT">Text</option>
-                                </select>
-                                <input type="text" id="ingestValue" placeholder="https://example.com/docs"
-                                    class="flex-grow">
-                                <button type="button" id="ingestBtn" class="btn primary small">Ingest</button>
-                            </div>
-
-                            <!-- Knowledge List -->
-                            <div class="knowledge-list-container">
-                                <table class="knowledge-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Type</th>
-                                            <th>Source / Content</th>
-                                            <th>Status</th>
-                                            <th>Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="knowledgeTableBody">
-                                        <!-- Rows injected by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- Review Tab -->
-                    <div id="tab-reviews" class="tab-content">
-                        <div class="section-box">
-                            <h3>🔍 Pending Extractions</h3>
-                            <div style="margin-bottom: 10px;">
-                                <button type="button" id="refreshReviewsBtn" class="btn secondary small">Refresh
-                                    List</button>
-                            </div>
-                            <div class="knowledge-list-container">
-                                <table class="knowledge-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Type</th>
-                                            <th>Content</th>
-                                            <th>Explainability (Why?)</th>
-                                            <th>Score</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="reviewsTableBody">
-                                        <!-- Rows injected by JS -->
-                                    </tbody>
-                                </table>
+                            <!-- Right: Rules -->
+                            <div class="rules-panel">
+                                <div class="panel-header">
+                                    <h3>Page-Level Rules</h3>
+                                    <p>Override behavior on specific pages.</p>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                                    <input type="text" placeholder="Search rules..." style="padding: 0.5rem;">
+                                    <button type="button" class="btn secondary small">+ Rule</button>
+                                </div>
+                                <div id="rulesList" style="flex: 1; overflow-y: auto;">
+                                    <!-- Rules injected here -->
+                                    <div class="rule-item">
+                                        <div class="rule-info">
+                                            <strong>/pricing</strong>
+                                            <span>High Sales Intensity</span>
+                                        </div>
+                                        <span class="badge-active">Active</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- STEP 4: DEPLOYMENT -->
+                    <div class="step-panel" id="step4">
+                        <div style="text-align: center; padding: 2rem;">
+                            <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
+                            <h3>Connection Ready!</h3>
+                            <p>Embed the following code into your website's <code>&lt;head&gt;</code> tag.</p>
+
+                            <div style="margin-top: 2rem; text-align: left;">
+                                <label>Widget Script</label>
+                                <textarea id="embedCode target=" rows="6" readonly
+                                    style="font-family: monospace; font-size: 0.9rem;">&lt;script src="https://bot.universal-ai.com/widget.js"&gt;&lt;/script&gt;</textarea>
+                                <button type="button" class="btn primary" style="width: 100%; margin-top: 1rem;"
+                                    onclick="copyEmbed()">Copy Code</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Footer (Nav) -->
+            <div class="wizard-footer">
+                <button type="button" id="prevBtn" class="btn secondary" style="visibility: hidden;">Back</button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="cancelBtn" class="btn text">Cancel</button>
+                    <button type="button" id="nextBtn" class="btn primary">Next</button>
                 </div>
             </div>
         </div>
-
-        <!-- Toast Notification -->
-        <div id="toast" class="toast hidden"></div>
     </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
 
     <script src="admin.js"></script>
 </body>

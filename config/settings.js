@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+// Force production mode if NODE_ENV is not explicitly set
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
 const validEnvironments = ['development', 'staging', 'production'];
 const env = process.env.NODE_ENV;
 

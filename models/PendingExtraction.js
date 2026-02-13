@@ -11,12 +11,25 @@ const PendingExtraction = sequelize.define("PendingExtraction", {
         type: DataTypes.STRING,
         allowNull: false
     },
-    source: {
-        type: DataTypes.ENUM('WIDGET', 'MANUAL'),
-        defaultValue: 'WIDGET'
+    sourceType: {
+        type: DataTypes.ENUM('AUTO', 'MANUAL', 'DRIFT'),
+        defaultValue: 'AUTO'
     },
+    contentType: {
+        type: DataTypes.ENUM('PAGE', 'PDF', 'DOCX', 'TEXT', 'NAVIGATION'),
+        defaultValue: 'PAGE'
+    },
+    pageContentId: {
+        type: DataTypes.UUID,
+        allowNull: true
+    },
+    // Legacy support removed to avoid Sequelize conflicts
+    // source: {
+    //    type: DataTypes.ENUM('WIDGET', 'MANUAL'),
+    //    defaultValue: 'WIDGET'
+    // },
     extractorType: {
-        type: DataTypes.ENUM('BRANDING', 'KNOWLEDGE', 'FORM', 'METADATA', 'NAVIGATION'),
+        type: DataTypes.ENUM('BRANDING', 'KNOWLEDGE', 'FORM', 'METADATA', 'NAVIGATION', 'DRIFT'),
         allowNull: false
     },
     rawData: {

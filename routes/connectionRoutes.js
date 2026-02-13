@@ -5,6 +5,7 @@ const sequelize = require("../config/db");
 const router = express.Router();
 const Connection = require("../models/Connection");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
+const PendingExtraction = require("../models/PendingExtraction");
 const scraperService = require("../services/scraperService");
 const aiService = require("../services/aiservice");
 const authorize = require("../middleware/rbac");
@@ -585,6 +586,151 @@ router.post("/:connectionId/extract", basicAuth, authorize(['OWNER']), async (re
     await connection.save();
 
     res.json({ success: true, token, message: "Extraction requested" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.8 List Pending Extractions
+router.get("/:connectionId/extractions", basicAuth, authorize(['EDITOR', 'OWNER']), async (req, res) => {
+  try {
+    const { connectionId } = req.params;
+    const status = req.query.status || 'PENDING';
+
+    const extractions = await PendingExtraction.findAll({
+      where: { connectionId, status },
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json(extractions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.9 Reject Extraction
+router.delete("/:connectionId/extractions/:id", basicAuth, authorize(['OWNER']), async (req, res) => {
+  try {
+    const { connectionId, id } = req.params;
+
+    const deleted = await PendingExtraction.destroy({
+      where: { id, connectionId }
+    });
+
+    if (!deleted) return res.status(404).json({ error: "Item not found" });
+
+    res.json({ success: true, message: "Rejected" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.10 Approve Extraction
+router.post("/:connectionId/extractions/:id/approve", basicAuth, authorize(['OWNER']), async (req, res) => {
+  try {
+    const { connectionId, id } = req.params;
+
+    const item = await PendingExtraction.findOne({ where: { id, connectionId } });
+    if (!item) return res.status(404).json({ error: "Item not found" });
+
+    const connection = await Connection.findOne({ where: { connectionId } });
+    const data = item.rawData;
+
+    // Logic based on Type
+    if (item.extractorType === 'METADATA') {
+      await connection.update({
+        assistantName: data.assistantName || connection.assistantName,
+        websiteName: data.websiteName || connection.websiteName
+      });
+    } else if (item.extractorType === 'BRANDING') {
+      // Assume data contains logoUrl etc.
+      // widgetRoutes.js saves rawData: data.branding. 
+      // Need to check structure. Assuming flat object or specific keys.
+      // For now, naive merge if keys match model
+      const updates = {};
+      if (data.logoUrl) updates.logoUrl = data.logoUrl;
+      if (data.favicon) updates.faviconPath = data.favicon;
+      await connection.update(updates);
+    } else if (item.extractorType === 'KNOWLEDGE') {
+      const { title, content, url } = data;
+      const contentHash = crypto.createHash('sha256').update(content || "").digest('hex');
+
+      await ConnectionKnowledge.create({
+        connectionId,
+        sourceType: 'URL',
+        sourceValue: url || item.pageUrl || 'Manual',
+        rawText: content,
+        cleanedText: content,
+        contentHash,
+        status: 'READY'
+      });
+    }
+
+    // Delete after approval
+    await item.destroy();
+
+    res.json({ success: true, message: "Approved" });
+
+  } catch (error) {
+    console.error("Approve Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.8 Explainability: List Answers
+router.get("/:connectionId/answers", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), async (req, res) => {
+  try {
+    const { connectionId } = req.params;
+    const { filter } = req.query; // 'ALL', 'AT_RISK', 'SAFE'
+    const ChatSession = require('../models/ChatSession');
+
+    // Fetch last 50 sessions
+    const sessions = await ChatSession.findAll({
+      where: { connectionId },
+      limit: 50,
+      order: [['updatedAt', 'DESC']]
+    });
+
+    let answers = [];
+
+    sessions.forEach(session => {
+      const msgs = session.messages || [];
+      msgs.forEach((msg, idx) => {
+        if (msg.role === 'assistant') {
+          // Find preceding user Q
+          const question = (idx > 0 && msgs[idx - 1].role === 'user') ? msgs[idx - 1].content : "(No question)";
+
+          // Determine Status/Confidence
+          const meta = msg.ai_metadata || {};
+          const confidence = meta.confidenceScore || 0.95;
+          let status = 'SAFE';
+          if (confidence < 0.7) status = 'AT_RISK';
+          if (meta.policyViolation) status = 'FLAGGED';
+
+          answers.push({
+            id: `${session.sessionId}_${idx}`,
+            sessionId: session.sessionId,
+            timestamp: msg.timestamp || session.updatedAt,
+            question: question,
+            answer: msg.content,
+            confidence: confidence,
+            status: status,
+            metadata: meta
+          });
+        }
+      });
+    });
+
+    // Filter
+    if (filter && filter !== 'ALL') {
+      answers = answers.filter(a => a.status === filter);
+    }
+
+    // Sort by time desc
+    answers.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    res.json(answers);
 
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -13,19 +13,33 @@ const basicAuth = require("../middleware/auth");
 router.get("/analytics", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), async (req, res) => {
     try {
         const sessions = await ChatSession.findAll();
+
+        // Calculate At-Risk (Global & Per Connection)
+        let atRiskCount = 0;
+        const riskMap = {}; // connectionId -> count
+
+        sessions.forEach(s => {
+            const msgs = s.messages || [];
+            msgs.forEach(m => {
+                if (m.role === 'assistant' && m.ai_metadata) {
+                    if ((m.ai_metadata.confidenceScore || 1) < 0.7) {
+                        atRiskCount++;
+                        riskMap[s.connectionId] = (riskMap[s.connectionId] || 0) + 1;
+                    }
+                }
+            });
+        });
+
         res.json({
             totalSessions: sessions.length,
-            totalMessages: sessions.reduce((a, s) => a + s.messages.length, 0)
+            totalMessages: sessions.reduce((a, s) => a + s.messages.length, 0),
+            globalAtRiskCount: atRiskCount,
+            riskMap: riskMap
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
-
-// Knowledge Ingestion Route
-router.post("/connections/:connectionId/knowledge/ingest", basicAuth, authorize(['EDITOR', 'OWNER']), connectionController.ingestKnowledge);
-router.post("/connections/:connectionId/branding/fetch", basicAuth, authorize(['EDITOR', 'OWNER']), connectionController.fetchBranding);
-router.get("/connections/:connectionId/details", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), connectionController.getConnectionDetails);
 
 // --- Phase 1.7: Admin Review ---
 
@@ -55,7 +69,7 @@ router.post("/extractions/:extractionId/review", basicAuth, authorize(['EDITOR',
         const { extractionId } = req.params;
         const { action, notes } = req.body; // action: "APPROVE" | "REJECT"
 
-        const extraction = await PendingExtraction.findByPk(extractionId);
+        const extraction = await PendingExtraction.findOne({ where: { id: extractionId } });
         if (!extraction) return res.status(404).json({ error: "Extraction not found" });
 
         if (extraction.status !== 'PENDING') {
@@ -100,13 +114,20 @@ router.post("/extractions/:extractionId/review", basicAuth, authorize(['EDITOR',
             }
             else if (extraction.extractorType === 'NAVIGATION') {
                 // Phase 2: Store in separate Navigation model
-                // For now, allow approval but just mark as APPROVED in Pending
-                // Or append to 'extractedTools' in Connection?
-                // let tools = connection.extractedTools || [];
-                // tools.push(extraction.rawData);
-                // connection.extractedTools = tools;
-                // connection.changed('extractedTools', true);
-                // await connection.save();
+            }
+            else if (extraction.extractorType === 'DRIFT') {
+                // Update Existing Knowledge
+                const updateData = extraction.rawData; // { knowledgeId, newContent, newHash }
+                if (updateData.knowledgeId) {
+                    const knowledge = await ConnectionKnowledge.findOne({ where: { id: updateData.knowledgeId } });
+                    if (knowledge) {
+                        knowledge.cleanedText = updateData.newContent;
+                        knowledge.contentHash = updateData.newHash;
+                        knowledge.status = 'READY';
+                        knowledge.lastCheckedAt = new Date();
+                        await knowledge.save();
+                    }
+                }
             }
 
             extraction.status = 'APPROVED';
@@ -164,7 +185,7 @@ router.post("/chat-sessions/:sessionId/messages/:index/feedback", basicAuth, aut
         if (targetMsg.ai_metadata && targetMsg.ai_metadata.sources) {
             for (const source of targetMsg.ai_metadata.sources) {
                 if (source.sourceId) {
-                    const knowledge = await ConnectionKnowledge.findByPk(source.sourceId);
+                    const knowledge = await ConnectionKnowledge.findOne({ where: { id: source.sourceId } });
                     if (knowledge) {
                         let score = knowledge.confidenceScore || 0.5;
 
@@ -185,6 +206,61 @@ router.post("/chat-sessions/:sessionId/messages/:index/feedback", basicAuth, aut
 
     } catch (error) {
         console.error("Feedback Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 1.7.4 Admin Trigger Extraction (Wizard)
+router.post("/connections/:connectionId/extract", basicAuth, authorize(['EDITOR', 'OWNER']), async (req, res) => {
+    try {
+        const { connectionId } = req.params;
+        const { url } = req.body;
+
+        if (!url) return res.status(400).json({ error: "URL is required" });
+
+        const scraperService = require("../services/scraperService");
+
+        // 1. Scrape
+        const result = await scraperService.scrapeWebsite(url);
+        if (!result.success) throw new Error(result.error);
+
+        // 2. Create Pending Extractions
+
+        // A. Metadata Proposal
+        if (result.metadata && (result.metadata.title || result.metadata.description)) {
+            await PendingExtraction.create({
+                connectionId,
+                extractorType: 'METADATA',
+                status: 'PENDING',
+                confidenceScore: 0.9,
+                rawData: {
+                    websiteName: result.metadata.title,
+                    websiteDescription: result.metadata.description
+                },
+                metadata: { sourceUrl: url }
+            });
+        }
+
+        // B. Knowledge Proposal
+        if (result.rawText && result.rawText.length > 50) {
+            await PendingExtraction.create({
+                connectionId,
+                extractorType: 'KNOWLEDGE',
+                status: 'PENDING',
+                confidenceScore: 0.85,
+                rawData: {
+                    title: result.metadata.title || "Scraped Content",
+                    content: result.rawText,
+                    url: url
+                },
+                metadata: { sourceUrl: url }
+            });
+        }
+
+        res.json({ success: true, message: "Extraction started. Please review pending items." });
+
+    } catch (error) {
+        console.error("Extraction Error:", error);
         res.status(500).json({ error: error.message });
     }
 });

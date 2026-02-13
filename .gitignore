@@ -37,3 +37,4 @@ github_actions_ed25519.pub
 server_*.log
 backups/
 *.log
+/AWS

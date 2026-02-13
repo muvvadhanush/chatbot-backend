@@ -14,6 +14,10 @@ const Connection = sequelize.define("Connection", {
   },
 
   websiteName: DataTypes.STRING,
+  websiteUrl: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   websiteDescription: DataTypes.TEXT,
   logoUrl: {
     type: DataTypes.STRING,

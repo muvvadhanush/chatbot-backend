@@ -30,12 +30,32 @@ const Connection = require("./models/Connection");
 const ConnectionKnowledge = require("./models/ConnectionKnowledge");
 const PendingExtraction = require("./models/PendingExtraction");
 const User = require("./models/User");
+const ConnectionCrawlSession = require("./models/ConnectionCrawlSession");
+const ConnectionDiscovery = require("./models/ConnectionDiscovery");
 
 // Associations
 Connection.hasMany(ConnectionKnowledge, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
 ConnectionKnowledge.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
 Connection.hasMany(PendingExtraction, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
 PendingExtraction.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
+
+Connection.hasMany(ConnectionCrawlSession, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
+ConnectionCrawlSession.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
+
+Connection.hasMany(ConnectionDiscovery, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
+ConnectionDiscovery.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
+
+const PageContent = require("./models/PageContent");
+const ManualUpload = require("./models/ManualUpload");
+
+// PageContent Associations
+Connection.hasMany(PageContent, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
+PageContent.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
+
+// PendingExtraction Association to PageContent
+// PendingExtraction Association to PageContent
+PageContent.hasMany(PendingExtraction, { foreignKey: 'pageContentId', sourceKey: 'id' });
+PendingExtraction.belongsTo(PageContent, { foreignKey: 'pageContentId', targetKey: 'id' });
 
 const app = express();
 

@@ -10,6 +10,7 @@ console.log("🔥 chatRoutes.js LOADED");
 // Main chat endpoint
 const chatController = require("../controllers/chatController");
 router.post("/send", chatController.sendMessage);
+router.post("/feedback", chatController.submitFeedback);
 
 // Get welcome message for a connection
 router.get("/welcome/:connectionId", async (req, res) => {

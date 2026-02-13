@@ -1,18 +1,65 @@
 (function () {
-  const config = window.ChatbotConfig;
+  // 1. Config Resolution (Global or Script Params)
+  let config = window.ChatbotConfig;
+  if (!config) {
+    const script = document.currentScript || document.querySelector('script[src*="widget.js"]');
+    if (script) {
+      try {
+        const src = script.src;
+        // Parse query params manually or via URL
+        const questionMark = src.indexOf('?');
+        if (questionMark !== -1) {
+          const params = new URLSearchParams(src.slice(questionMark));
+          const id = params.get('id');
+          const key = params.get('key');
+          if (id) {
+            config = { connectionId: id, password: key, apiUrl: null };
+          }
+        }
+      } catch (e) { console.error("Config parse error", e); }
+    }
+  }
+  window.ChatbotConfig = config; // Expose for debugging
+
   if (!config || !config.connectionId) {
     console.error("❌ ChatbotConfig missing");
     return;
   }
 
   // Determine Base URL (Config > Script Origin > Default)
-  let baseUrl = config.apiUrl || config.backendUrl; // Support both keys
+  let baseUrl = config.apiUrl || config.backendUrl;
   if (!baseUrl) {
-    // Fallback to AWS EC2 Production IP
-    baseUrl = 'http://13.48.43.200';
+    // Auto-detect from script src if possible, else fallback
+    const script = document.currentScript || document.querySelector('script[src*="widget.js"]');
+    if (script && script.src.startsWith('http')) {
+      baseUrl = new URL(script.src).origin;
+    } else {
+      baseUrl = 'http://13.48.43.200'; // Fallback
+    }
   }
-  // Remove trailing slash if present
   baseUrl = baseUrl.replace(/\/$/, "");
+
+  // --- HANDSHAKE ---
+  (async function handshake() {
+    if (config.password) {
+      try {
+        // Adjust path if needed. Assuming /api/v1/widget/hello
+        fetch(`${baseUrl}/api/v1/widget/hello`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionId: config.connectionId,
+            password: config.password,
+            origin: window.location.origin,
+            pageTitle: document.title
+          })
+        }).then(r => r.json()).then(d => {
+          if (d.ok) console.log("🤝 Handshake Verified");
+          else console.warn("Handshake Failed:", d.error);
+        }).catch(e => console.error("Handshake Network Error", e));
+      } catch (e) { }
+    }
+  })();
 
   // Session Persistence (DISABLED per user request to start fresh on load)
   const sessionKey = `chat_session_${config.connectionId}`;
@@ -27,6 +74,28 @@
   container.style.right = "20px";
   container.style.zIndex = "2147483647"; // Max Safe Integer for CSS
   document.body.appendChild(container);
+
+  // Expose Feedback Function to Shadow DOM
+  container.submitFeedback = async (index, rating, btn) => {
+    // Visual Feedback
+    const parent = btn.parentElement;
+    Array.from(parent.children).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Call API
+    try {
+      await fetch(`${baseUrl}/api/v1/chat/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          messageIndex: index,
+          rating
+        })
+      });
+      console.log("Feedback sent:", rating);
+    } catch (e) { console.error("Feedback failed", e); }
+  };
 
   // Anti-Removal Protection (Host frameworks like React might wipe the body)
   const observer = new MutationObserver((mutations) => {
@@ -363,6 +432,33 @@
         30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
         40%, 60% { transform: translate3d(4px, 0, 0); }
       }
+      .feedback-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .msg.bot:hover .feedback-actions {
+        opacity: 1;
+      }
+      .feedback-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        opacity: 0.5;
+        padding: 2px;
+        transition: transform 0.2s, opacity 0.2s;
+      }
+      .feedback-btn:hover {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+      .feedback-btn.active {
+        opacity: 1;
+        transform: scale(1.1);
+      }
     </style>
 
     <div id="welcome-bubble">
@@ -519,28 +615,39 @@
     if (saved) {
       try {
         const history = JSON.parse(saved);
-        history.forEach(m => addMessage(m.text, m.who, false));
+        history.forEach(m => addMessage(m.text, m.who, false, m.index || -1));
       } catch (e) {
         sessionStorage.removeItem(storageKey);
       }
     }
   }
 
-  function saveMessage(text, who) {
+  function saveMessage(text, who, index = -1) {
     const history = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
-    history.push({ text, who });
+    history.push({ text, who, index });
     sessionStorage.setItem(storageKey, JSON.stringify(history));
   }
 
-  function addMessage(text, who = "bot", save = true) {
-    if (save) saveMessage(text, who);
+  function addMessage(text, who = "bot", save = true, index = -1) {
+    if (save) saveMessage(text, who, index);
 
     const div = document.createElement("div");
     div.className = `msg ${who}`;
     div.setAttribute("role", "listitem");
-    // Handle newlines like the user requested: text.split('\n') -> <br>
+
     const formattedText = text.replace(/\n/g, '<br>');
-    div.innerHTML = `<div class="msg-bubble">${formattedText}</div>`;
+
+    let feedbackHtml = '';
+    if (who === 'bot' && index !== -1) {
+      feedbackHtml = `
+            <div class="feedback-actions">
+                <button class="feedback-btn" title="Helpful" onclick="this.getRootNode().host.submitFeedback(${index}, 'CORRECT', this)">👍</button>
+                <button class="feedback-btn" title="Not Helpful" onclick="this.getRootNode().host.submitFeedback(${index}, 'INCORRECT', this)">👎</button>
+            </div>
+        `;
+    }
+
+    div.innerHTML = `<div class="msg-bubble">${formattedText}</div>${feedbackHtml}`;
     messages.appendChild(div);
     scrollToBottom();
   }
@@ -595,7 +702,7 @@
     showTyping();
 
     try {
-      const res = await fetch(`${baseUrl}/api/chat/send`, {
+      const res = await fetch(`${baseUrl}/api/v1/chat/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -616,7 +723,7 @@
       const data = await res.json();
 
       if (data.messages && data.messages.length) {
-        addMessage(data.messages[data.messages.length - 1].text, "bot");
+        addMessage(data.messages[data.messages.length - 1].text, "bot", true, data.messageIndex);
       }
 
       if (data.suggestions && data.suggestions.length) {
@@ -785,7 +892,7 @@
   };
 
   // Fetch welcome info from server
-  fetch(`${baseUrl}/api/chat/welcome/${config.connectionId}`)
+  fetch(`${baseUrl}/api/v1/chat/welcome/${config.connectionId}`)
     .then(r => r.json())
     .then(data => {
       if (data.assistantName) {
@@ -826,7 +933,7 @@
       "Panel (#panel)": panel,
       "Messages (#messages)": messages,
       "Input (#text)": input,
-      "Welcome Bubble": welcomeBubble
+      "Welcome Bubble": bubble
     };
 
     let allGood = true;

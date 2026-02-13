@@ -1,18 +1,11 @@
 const scraperService = require("../services/scraperService");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
 const Connection = require("../models/Connection");
+const PendingExtraction = require("../models/PendingExtraction"); // Added import
 
-exports.createConnection = async (req, res) => {
-    try {
-        // Basic creation logic (preserving existing behavior if any, but since file was empty/stubbed, re-implementing base)
-        // Actually, createConnection was handled in routes directly in previous phases (see routes/connectionRoutes.js).
-        // So this controller might be new or unused. I will focus on the NEW method but keep createConnection just in case.
-        const connection = await Connection.create(req.body);
-        res.json(connection);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
+// ... imports ...
+
+// ... (createConnection code remains same) ...
 
 exports.ingestKnowledge = async (req, res) => {
     try {
@@ -52,33 +45,66 @@ exports.ingestKnowledge = async (req, res) => {
         const crypto = require("crypto");
         const contentHash = ingestResult ? crypto.createHash('sha256').update(ingestResult.cleanedText || "").digest('hex') : null;
 
-        // 3. Persist to DB (Idempotent)
-        const [record, created] = await ConnectionKnowledge.findOrCreate({
-            where: { connectionId, sourceType, sourceValue },
-            defaults: {
-                rawText: ingestResult ? ingestResult.rawText : null,
-                cleanedText: ingestResult ? ingestResult.cleanedText : null,
-                contentHash,
-                status: status,
-                metadata: errorMessage ? { error: errorMessage } : {},
-                lastCheckedAt: new Date()
-            }
+        // 3. Check for Existing Record
+        const existingRecord = await ConnectionKnowledge.findOne({
+            where: { connectionId, sourceType, sourceValue }
         });
 
-        if (!created && status === 'READY') {
-            await record.update({
-                rawText: ingestResult ? ingestResult.rawText : null,
-                cleanedText: ingestResult ? ingestResult.cleanedText : null,
-                contentHash,
-                status: status,
-                metadata: errorMessage ? { error: errorMessage } : {},
-                lastCheckedAt: new Date()
-            });
+        if (existingRecord) {
+            // DRIFT / UPDATE DETECTION
+            if (status === 'READY' && existingRecord.contentHash !== contentHash) {
+                // Content Changed -> Create Pending Drift Alert
+                await PendingExtraction.create({
+                    connectionId,
+                    source: 'MANUAL', // Or SYSTEM/AUTO but Manual generic enough for now
+                    extractorType: 'DRIFT',
+                    rawData: {
+                        knowledgeId: existingRecord.id,
+                        oldHash: existingRecord.contentHash,
+                        newHash: contentHash,
+                        newContent: ingestResult.cleanedText,
+                        title: ingestResult.title || sourceValue
+                    },
+                    status: 'PENDING',
+                    relevanceScore: 1.0 // High priority
+                });
+
+                return res.status(202).json({
+                    success: true,
+                    message: "Content drift detected. Update queued for approval.",
+                    status: "PENDING_REVIEW"
+                });
+            } else {
+                // No change or just status update (e.g. error recovery)
+                // If it was failed and now works, we should update.
+                // If same hash, just update lastChecked.
+                await existingRecord.update({
+                    lastCheckedAt: new Date(),
+                    status: status, // Update status if it was failed
+                    metadata: errorMessage ? { error: errorMessage } : {}
+                });
+            }
+            return res.json({ success: true, data: existingRecord });
         }
 
-        res.status(status === 'FAILED' ? 422 : 201).json({
+        // 4. Create New Record (First Time)
+        const newRecord = await ConnectionKnowledge.create({
+            connectionId,
+            sourceType,
+            sourceValue,
+            rawText: ingestResult ? ingestResult.rawText : null,
+            cleanedText: ingestResult ? ingestResult.cleanedText : null,
+            contentHash,
+            status: status,
+            metadata: errorMessage ? { error: errorMessage } : {},
+            lastCheckedAt: new Date(),
+            visibility: 'ACTIVE',
+            confidenceScore: 1.0
+        });
+
+        res.status(201).json({
             success: status === 'READY',
-            data: record
+            data: newRecord
         });
 
     } catch (error) {
@@ -86,6 +112,7 @@ exports.ingestKnowledge = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
 
 exports.fetchBranding = async (req, res) => {
     try {

@@ -47,9 +47,11 @@ async function runDiagnostics() {
     try {
         if (!process.env.OPENAI_API_KEY) throw new Error('No API key provided');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const content = `Extract all key details from this website link: ${req.body.url}. Summarize the main information including company name, services/products offered, contact details, location, pricing (if available), and any other important highlights`
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
-            messages: [{ role: "user", content: "Hi" }],
+            messages: [{ role: "user", content: content }],
             max_tokens: 5
         });
         if (response.choices && response.choices.length > 0) {

@@ -1,7 +1,7 @@
 {
-  "name": "backend",
+  "name": "chatbot-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend service for the AI Chatbot Portal",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

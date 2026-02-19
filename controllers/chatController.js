@@ -4,7 +4,7 @@ const ConnectionKnowledge = require("../models/ConnectionKnowledge");
 const ConfidencePolicy = require("../models/ConfidencePolicy");
 
 const promptService = require("../services/promptService");
-const aiService = require("./services/aiService");
+const aiService = require("../services/aiService");
 const { detectKnowledgeGap } = require("../services/gapDetectionService");
 const { sendSlackAlert } = require("../services/integrations/slackService");
 const tokenLogger = require("../utils/tokenLogger");

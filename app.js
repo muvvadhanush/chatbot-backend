@@ -53,6 +53,7 @@ app.use(cors({
 
 // Security Headers
 app.use(helmet({
+  hsts: false, // Disable HSTS to prevent HTTPS upgrade on IP
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

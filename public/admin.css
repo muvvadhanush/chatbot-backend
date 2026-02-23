@@ -4,7 +4,8 @@
     /* Core Colors - Neural Indigo Palette */
     --primary: #6d5dfc;
     --primary-dark: #5b4cfc;
-    --bg-body: #e0e5ec;
+    --bg-body: #f1f5f9;
+    /* Soft misty slate */
     --bg-sidebar: rgba(224, 229, 236, 0.7);
     /* Glassmorphism base */
     --text-primary: #4d5b7c;
@@ -39,8 +40,9 @@
 }
 
 [data-theme="dark"] {
-    --bg-body: #2d3436;
-    --bg-sidebar: rgba(45, 52, 54, 0.7);
+    --bg-body: #1e293b;
+    /* Deep slate - light dark grey */
+    --bg-sidebar: rgba(30, 41, 59, 0.5);
     --text-primary: #dfe6e9;
     --text-secondary: #b2bec3;
     --accent: var(--primary);
@@ -86,10 +88,15 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background: var(--bg-body);
+    background: linear-gradient(135deg, var(--bg-body) 0%, #cbd5e1 100%);
+    background-attachment: fixed;
     color: var(--text-primary);
     display: flex;
     min-height: 100vh;
+}
+
+[data-theme="dark"] body {
+    background: linear-gradient(135deg, var(--bg-body) 0%, #0f172a 100%);
 }
 
 h1,

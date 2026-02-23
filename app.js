@@ -85,7 +85,9 @@ app.use(helmet({
       upgradeInsecureRequests: null
     }
   },
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false
 }));
 app.use((req, res, next) => {
   // Custom headers if needed (Helmet covers most)

@@ -53,7 +53,7 @@ app.use(cors({
 
 // Security Headers
 app.use(helmet({
-  hsts: false, // Disable HSTS to prevent HTTPS upgrade on IP
+  hsts: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -63,11 +63,10 @@ app.use(helmet({
       connectSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      objectSrc: ["'none'"],
-
-    },
+      objectSrc: ["'none'"]
+    }
   },
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow widget to be loaded by other sites
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use((req, res, next) => {
   // Custom headers if needed (Helmet covers most)

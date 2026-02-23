@@ -52,7 +52,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await res.json();
 
         if (!res.ok) {
-            throw new Error(data.error || 'Login failed');
+            const msg = data.details || data.error || 'Login failed';
+            throw new Error(msg);
         }
 
         // Success
@@ -65,7 +66,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         }, 500);
 
     } catch (err) {
-        errEl.textContent = err.message;
+        errEl.textContent = `❌ ${err.message}`;
+        console.error('Login Error:', err);
         btn.textContent = origText;
         btn.disabled = false;
 

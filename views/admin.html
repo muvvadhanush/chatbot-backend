@@ -15,34 +15,51 @@
 
 <body>
 
-    <!-- SIDEBAR -->
-    <nav class="sidebar">
+    <!-- TOP NAVBAR -->
+    <nav class="navbar-top">
         <div class="brand">
             <span class="material-symbols-outlined" style="color: var(--primary);">neurology</span>
-            Neural Bot
+            <span class="brand-name">Neural Bot</span>
         </div>
 
         <div class="nav-menu">
             <a href="#" id="navDashboard" class="nav-item active">
                 <span class="material-symbols-outlined">dashboard</span>
-                Dashboard
+                <span class="nav-label">Dashboard</span>
             </a>
             <a href="#" id="navConnections" class="nav-item">
                 <span class="material-symbols-outlined">hub</span>
-                Connections
-                <span class="status-badge success" style="margin-left: auto; font-size: 0.7rem;">12</span>
+                <span class="nav-label">Connections</span>
+                <span class="status-badge success">12</span>
             </a>
             <a href="#" id="navAnalytics" class="nav-item">
                 <span class="material-symbols-outlined">analytics</span>
-                Analytics
+                <span class="nav-label">Analytics</span>
             </a>
             <a href="#" id="navSettings" class="nav-item">
                 <span class="material-symbols-outlined">settings</span>
-                Settings
+                <span class="nav-label">Settings</span>
             </a>
-            <a href="#" id="btnLogout" class="nav-item" style="margin-top: auto; color: var(--error);">
+        </div>
+
+        <div class="navbar-center">
+            <div class="search-bar">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" placeholder="Search...">
+            </div>
+        </div>
+
+        <div class="nav-actions">
+            <div class="system-status">
+                <span class="status-indicator"></span>
+                <span class="status-text">System Active</span>
+            </div>
+            <button id="btnThemeToggle" class="btn-theme-nav">
+                <span class="material-symbols-outlined" id="themeIcon">light_mode</span>
+            </button>
+            <a href="#" id="btnLogout" class="nav-item logout">
                 <span class="material-symbols-outlined">logout</span>
-                Logout
+                <span class="nav-label">Logout</span>
             </a>
         </div>
     </nav>
@@ -52,28 +69,7 @@
 
         <!-- DASHBOARD VIEW -->
         <div id="dashboardView">
-            <!-- HEADER -->
-            <header class="header">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <button id="btnMobileMenu" class="btn-icon mobile-only">
-                        <span class="material-symbols-outlined">menu</span>
-                    </button>
-                    <div class="page-title">
-                        <h1>Dashboard Overview</h1>
-                        <p>Manage your AI connections and performance.</p>
-                    </div>
-                </div>
-
-                <div class="user-profile">
-                    <button id="btnThemeToggle" class="btn-icon">
-                        <span class="material-symbols-outlined" id="themeIcon">light_mode</span>
-                    </button>
-                    <button class="btn-icon">
-                        <span class="material-symbols-outlined">notifications</span>
-                    </button>
-                    <div class="avatar">T</div>
-                </div>
-            </header>
+            <!-- Legacy Header Removed -->
 
             <!-- METRICS -->
             <div class="metrics-grid">

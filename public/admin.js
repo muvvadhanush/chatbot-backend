@@ -146,8 +146,8 @@ async function loadConnections() {
             card.innerHTML = `
                 ${launchBadge}
                 <div class="control-header">
-                    <div class="control-meta" style="display:flex; gap:10px; align-items:center;">
-                        <div class="avatar-circle" style="width:40px; height:40px; font-size:1.2rem;">${initial}</div>
+                    <div class="control-meta">
+                        <div class="avatar-circle">${initial}</div>
                         <div>
                             <h3>${conn.assistantName || 'Untitled Bot'}</h3>
                             <a href="${conn.websiteUrl}" target="_blank">${conn.websiteName || 'No Website'}</a>
@@ -234,10 +234,10 @@ function updateMetric(id, value) {
 function setupEventListeners() {
     // Mobile Menu Toggle
     const btnMobile = document.getElementById('btnMobileMenu');
-    const sidebar = document.querySelector('.sidebar');
-    if (btnMobile) {
+    const navbar = document.querySelector('.navbar-top');
+    if (btnMobile && navbar) {
         btnMobile.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            navbar.classList.toggle('active');
         });
     }
 
@@ -305,9 +305,9 @@ function setupEventListeners() {
             const contentId = tab.dataset.tab;
             document.getElementById(contentId).classList.add('active');
 
-            // Close sidebar on mobile
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('active');
+            // Close navbar on mobile
+            if (window.innerWidth <= 768 && navbar) {
+                navbar.classList.remove('active');
             }
         });
     });

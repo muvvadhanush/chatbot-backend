@@ -792,18 +792,32 @@ function copySnippet() {
     const el = document.getElementById('codeSnippet');
     if (!el) return;
     const text = el.textContent;
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('Snippet copied to clipboard!');
-    }).catch(() => {
-        // Fallback for older browsers
+
+    const fallback = () => {
         const textArea = document.createElement('textarea');
         textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+        try {
+            document.execCommand('copy');
+            showToast('Snippet copied!');
+        } catch (err) {
+            showToast('Failed to copy', true);
+        }
         document.body.removeChild(textArea);
-        showToast('Snippet copied!');
-    });
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Snippet copied to clipboard!');
+        }).catch(fallback);
+    } else {
+        fallback();
+    }
 }
 
 /**

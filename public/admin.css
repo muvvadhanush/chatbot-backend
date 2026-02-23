@@ -180,18 +180,15 @@ h3 {
 }
 
 .nav-menu {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     height: 100%;
 }
 
-.navbar-center {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    max-width: 400px;
-}
 
 .search-bar {
     display: flex;
@@ -248,7 +245,8 @@ h3 {
 .nav-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 15px;
+    margin-left: auto;
 }
 
 .system-status {

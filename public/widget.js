@@ -26,15 +26,22 @@
     return;
   }
 
-  // Determine Base URL (Config > Script Origin > Default)
+  // Determine Base URL (Config > Script Origin > Current Origin)
   let baseUrl = config.apiUrl || config.backendUrl;
   if (!baseUrl) {
-    // Auto-detect from script src if possible, else fallback
     const script = document.currentScript || document.querySelector('script[src*="widget.js"]');
-    if (script && script.src.startsWith('http')) {
-      baseUrl = new URL(script.src).origin;
-    } else {
-      baseUrl = 'http://13.48.43.200'; // Fallback
+    if (script && script.src) {
+      if (script.src.startsWith('http')) {
+        baseUrl = new URL(script.src).origin;
+      } else if (script.src.startsWith('//')) {
+        baseUrl = window.location.protocol + script.src;
+        baseUrl = new URL(baseUrl).origin;
+      }
+    }
+
+    // Final fallback to the current document origin if still empty (common for relative scripts)
+    if (!baseUrl) {
+      baseUrl = window.location.origin;
     }
   }
   baseUrl = baseUrl.replace(/\/$/, "");

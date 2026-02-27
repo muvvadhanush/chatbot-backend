@@ -129,16 +129,16 @@
         box-sizing: border-box;
       }
       #btn {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        width: 68px;
+        height: 68px;
+        border-radius: 22px;
+        background: #6d5dfc;
         color: #fff;
-        font-size: 26px;
+        font-size: 28px;
         border: none;
         cursor: pointer;
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 12px 32px rgba(109, 93, 252, 0.3);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -146,14 +146,14 @@
         padding: 0;
       }
       #btn-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
+        width: 100%;
+        height: 100%;
         object-fit: cover;
+        opacity: 0.9;
       }
       #btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+        transform: translateY(-5px) rotate(5deg);
+        box-shadow: 0 16px 40px rgba(109, 93, 252, 0.4);
       }
 
       /* ===============================
@@ -165,25 +165,28 @@
          =============================== */
       #welcome-bubble {
         position: absolute; /* Changed to absolute to be relative to container */
-        right: 70px;
-        bottom: 80px; /* Adjust to sit above button */
+        right: 0;
+        bottom: 85px; /* Adjust to sit above button */
         
-        background: white;
-        color: #1f2937; /* var(--bg-color) assumption */
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        border-bottom-right-radius: 0;
-        
-        font-size: 0.9rem;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        color: #1f2937;
+        padding: 14px 20px;
+        border-radius: 18px;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+        max-width: 260px;
+        font-family: inherit;
+        font-size: 14px;
         font-weight: 500;
-        white-space: nowrap;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        
+        animation: slideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        z-index: 10000;
         opacity: 0;
         transform: translateY(10px);
         transition: opacity 0.5s ease-out, transform 0.5s ease-out;
         pointer-events: none;
-        z-index: 10000;
       }
 
       #welcome-bubble.is-visible {
@@ -236,32 +239,43 @@
         bottom: 100px;
         right: 20px;
         width: 360px;
-        height: 500px;
-        background: #fff;
-        border-radius: 16px;
+        height: 540px;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
         display: none;
         flex-direction: column;
-        box-shadow: 0 16px 48px rgba(0,0,0,.25);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         overflow: hidden;
-        border: 1px solid rgba(0,0,0,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       #header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 16px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #1a1a1a;
+        padding: 20px;
         display: flex;
         align-items: center;
         gap: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       }
-      #header-logo {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: rgba(255,255,255,0.2);
-        object-fit: contain;
-        padding: 4px;
-        border: 2px solid rgba(255,255,255,0.3);
+      .avatar-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #6d5dfc;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        flex-shrink: 0;
       }
       #header-info {
         flex: 1;
@@ -269,56 +283,67 @@
       #header-name {
         font-weight: 700;
         font-size: 16px;
-        letter-spacing: 0.3px;
+        letter-spacing: -0.3px;
         margin-bottom: 2px;
+        color: #1f2937;
       }
       #header-status {
-        font-size: 12px;
-        opacity: 0.9;
+        font-size: 11px;
+        opacity: 0.7;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         display: flex;
         align-items: center;
         gap: 5px;
+        color: #4b5563;
       }
       #status-dot {
-        width: 8px;
-        height: 8px;
-        background: #4ade80;
+        width: 7px;
+        height: 7px;
+        background: #10b981;
         border-radius: 50%;
         animation: pulse 2s infinite;
       }
       @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
       }
       #close-btn {
-        background: rgba(255,255,255,0.2);
+        background: rgba(0, 0, 0, 0.05);
         border: none;
-        color: white;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
+        color: #4b5563;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
         cursor: pointer;
-        font-size: 14px;
-        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.2s;
       }
       #close-btn:hover {
-        background: rgba(255,255,255,0.3);
+        background: rgba(0, 0, 0, 0.1);
+        transform: rotate(90deg);
       }
       #messages {
         flex: 1;
-        padding: 12px;
+        padding: 20px;
         overflow-y: auto;
         font-size: 14px;
-        background: #f8f9fa;
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
       }
       .msg {
-        margin-bottom: 12px;
         max-width: 85%;
-        animation: fadeIn 0.3s ease;
+        animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(8px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; transform: translateY(12px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .msg.user {
         margin-left: auto;
@@ -326,21 +351,24 @@
       }
       .msg-bubble {
         display: inline-block;
-        padding: 0.8rem 1rem;
-        border-radius: 12px;
-        font-size: 0.95rem;
-        line-height: 1.4;
+        padding: 12px 16px;
+        border-radius: 18px;
+        line-height: 1.5;
+        font-weight: 500;
       }
       .msg.user .msg-bubble {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* var(--primary) substitute */
+        background: #6d5dfc;
         color: white;
-        border-bottom-right-radius: 2px;
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 8px 16px rgba(109, 93, 252, 0.2);
       }
       .msg.bot .msg-bubble {
-        background: #f3f4f6; /* Used light gray instead of transparent for visibility on white panel */
-        color: #1f2937; /* var(--text-main) */
-        border-bottom-left-radius: 2px;
-        box-shadow: none;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(4px);
+        color: #374151;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border: 1px solid rgba(255, 255, 255, 0.5);
       }
       
       /* Suggestions */
@@ -348,56 +376,68 @@
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
-        padding: 8px 12px;
-        background: #f8f9fa;
-        border-top: 1px solid #eee;
+        padding: 12px;
+        background: transparent;
+        overflow-x: auto;
       }
       .suggestion-btn {
-        background: white;
-        border: 1px solid #667eea;
-        color: #667eea;
-        padding: 8px 14px;
-        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.4);
+        border: 1px solid rgba(109, 93, 252, 0.3);
+        color: #6d5dfc;
+        padding: 8px 16px;
+        border-radius: 14px;
         font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        white-space: nowrap;
       }
       .suggestion-btn:hover {
-        background: #667eea;
+        background: #6d5dfc;
         color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(109, 93, 252, 0.2);
       }
       
       #input-area {
         display: flex;
-        padding: 12px;
-        border-top: 1px solid #eee;
-        background: white;
+        padding: 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
       }
       #text {
         flex: 1;
-        border: 1px solid #ddd;
-        padding: 10px 14px;
-        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        padding: 12px 18px;
+        border-radius: 14px;
         outline: none;
         font-size: 14px;
-        transition: border-color 0.2s;
+        transition: all 0.2s;
+        color: #1f2937;
       }
       #text:focus {
-        border-color: #667eea;
+        background: white;
+        border-color: #6d5dfc;
+        box-shadow: 0 0 0 4px rgba(109, 93, 252, 0.1);
       }
       .send {
         border: none;
-        padding: 10px 16px;
+        padding: 10px 20px;
         cursor: pointer;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #6d5dfc;
         color: white;
-        border-radius: 24px;
-        margin-left: 8px;
-        font-weight: 500;
-        transition: transform 0.2s;
+        border-radius: 12px;
+        margin-left: 10px;
+        font-weight: 700;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(109, 93, 252, 0.3);
       }
       .send:hover {
+        background: #5b4cfc;
         transform: scale(1.05);
+        box-shadow: 0 6px 16px rgba(109, 93, 252, 0.4);
       }
       
       .typing {
@@ -472,7 +512,8 @@
 
     <div id="panel">
       <div id="header">
-        <img id="header-logo" src="" alt="" style="display:none" />
+        <div id="header-avatar" class="avatar-circle">A</div>
+        <img id="header-logo" src="" alt="Logo" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; display: none;" />
         <div id="header-info">
           <div id="header-name">AI Assistant</div>
           <div id="header-status"><span id="status-dot"></span> Online • Ready to help</div>
@@ -574,25 +615,12 @@
         if (iden.welcomeMessage) {
           bubbleText.textContent = iden.welcomeMessage;
         }
+        // Update Avatar if name provided
         if (iden.name) {
           headerName.textContent = iden.name;
-        }
-
-        // Update Logo if provided
-        if (iden.logoUrl) {
-          let logoUrl = iden.logoUrl;
-          if (logoUrl.startsWith("/")) logoUrl = `${baseUrl}${logoUrl}`;
-
-          // Update header logo
-          headerLogo.src = logoUrl;
-          headerLogo.onload = () => { headerLogo.style.display = "block"; };
-
-          // Update button logo
-          btnLogo.src = logoUrl;
-          btnLogo.onload = () => {
-            btnLogo.style.display = "block";
-            btnIcon.style.display = "none";
-          };
+          const initial = iden.name[0].toUpperCase();
+          const avatar = shadow.querySelector("#header-avatar");
+          if (avatar) avatar.textContent = initial;
         }
       } else {
         console.warn("⚠️ Auto-extract failed or returned unexpected data:", data);
@@ -897,26 +925,12 @@
     .then(data => {
       if (data.assistantName) {
         headerName.textContent = data.assistantName;
+        const initial = data.assistantName[0].toUpperCase();
+        const avatar = shadow.querySelector("#header-avatar");
+        if (avatar) avatar.textContent = initial;
       }
       if (data.welcomeMessage) {
         bubbleText.textContent = data.welcomeMessage;
-      }
-
-      // Update Logo if provided
-      if (data.logoUrl) {
-        let logoUrl = data.logoUrl;
-        if (logoUrl.startsWith("/")) logoUrl = `${baseUrl}${logoUrl}`;
-
-        // Update header logo
-        headerLogo.src = logoUrl;
-        headerLogo.onload = () => { headerLogo.style.display = 'block'; };
-
-        // Update button logo
-        btnLogo.src = logoUrl;
-        btnLogo.onload = () => {
-          btnLogo.style.display = 'block';
-          btnIcon.style.display = 'none';
-        };
       }
     })
     .catch(() => { });

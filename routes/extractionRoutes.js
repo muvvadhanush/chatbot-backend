@@ -58,7 +58,7 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         const hash = hashContent(cleanText);
 
         // Store ManualUpload
-        let fileType = 'TXT';
+        let fileType = 'TEXT';
         if (file.mimetype === 'application/pdf') fileType = 'PDF';
         if (file.mimetype.includes('word')) fileType = 'DOCX';
 

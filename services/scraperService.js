@@ -4,14 +4,15 @@
  */
 const fs = require('fs');
 const path = require('path');
+const cheerio = require('cheerio');
 const { pipeline } = require('stream/promises');
 
 class ScraperService {
 
     constructor() {
-        this.TIMEOUT_MS = 5000;
-        this.MAX_SIZE_BYTES = 50 * 1024; // 50KB limit for text
-        this.MAX_IMG_BYTES = 200 * 1024; // 200KB limit for images
+        this.TIMEOUT_MS = 30000; // 30s
+        this.MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+        this.MAX_IMG_BYTES = 5 * 1024 * 1024; // 5MB
     }
 
     /**
@@ -30,6 +31,7 @@ class ScraperService {
         const report = {
             faviconPath: null,
             logoPath: null,
+            logoBase64: null,
             status: 'FAILED'
         };
 
@@ -92,6 +94,19 @@ class ScraperService {
                 }
             }
 
+            // C. Convert Logo to Base64 (to fix Mixed Content issues in local dev)
+            if (report.logoPath) {
+                try {
+                    const fullLogoPath = path.join(targetDir, 'logo.png');
+                    if (fs.existsSync(fullLogoPath)) {
+                        const buffer = fs.readFileSync(fullLogoPath);
+                        report.logoBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
+                    }
+                } catch (e) {
+                    console.warn("Base64 Logo conversion failed:", e.message);
+                }
+            }
+
             // Determine Status
             if (report.faviconPath && report.logoPath) report.status = 'READY';
             else if (report.faviconPath || report.logoPath) report.status = 'PARTIAL';
@@ -135,31 +150,74 @@ class ScraperService {
     async scrapeWebsite(url) {
         try {
             const response = await fetch(url, {
-                headers: { "User-Agent": "ChatbotIdentityBot/1.0" }
+                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
             });
 
             if (!response.ok) throw new Error("Failed to fetch website");
 
             const html = await response.text();
+            const $ = cheerio.load(html);
 
-            // Extract Title
-            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-            const title = titleMatch ? titleMatch[1].trim() : "";
+            // 1. Metadata Extraction
+            const metadata = {
+                title: $('title').text() || $('meta[property="og:title"]').attr('content') || "",
+                description: $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || "",
+                ogImage: $('meta[property="og:image"]').attr('content'),
+                favicon: $('link[rel="icon"]').attr('href') || $('link[rel="shortcut icon"]').attr('href'),
+                jsonLd: []
+            };
 
-            // Extract Meta Description
-            const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
-            const description = descMatch ? descMatch[1].trim() : "";
+            // Extract JSON-LD
+            $('script[type="application/ld+json"]').each((i, el) => {
+                try {
+                    metadata.jsonLd.push(JSON.parse($(el).html()));
+                } catch (e) { }
+            });
 
-            // Extract Clean Body Text (for AI inference)
-            const cleanText = this._cleanHTML(html);
+            // 2. Form Extraction
+            const forms = [];
+            $('form').each((i, el) => {
+                const form = $(el);
+                const inputs = [];
+                form.find('input, textarea, select').each((j, inp) => {
+                    const iEl = $(inp);
+                    inputs.push({
+                        name: iEl.attr('name') || iEl.attr('id'),
+                        type: iEl.attr('type') || iEl.prop('tagName').toLowerCase(),
+                        placeholder: iEl.attr('placeholder'),
+                        required: iEl.attr('required') !== undefined
+                    });
+                });
+                forms.push({
+                    action: form.attr('action'),
+                    method: form.attr('method') || 'GET',
+                    inputs: inputs,
+                    id: form.attr('id')
+                });
+            });
+
+            // 3. Navigation Extraction
+            const navigation = [];
+            $('nav a, header a, footer a').each((i, el) => {
+                const link = $(el);
+                const href = link.attr('href');
+                const text = link.text().trim();
+                if (href && text && !href.startsWith('#') && !href.startsWith('javascript:')) {
+                    navigation.push({ text, href: new URL(href, url).href });
+                }
+            });
+
+            // 4. Clean Text (Preserve structure better than regex?)
+            // Remove scripts/styles
+            $('script, style, noscript, svg').remove();
+            const cleanText = $('body').text().replace(/\s+/g, ' ').trim();
 
             return {
                 success: true,
-                metadata: {
-                    title,
-                    description
-                },
-                rawText: cleanText // Returning clean text as "rawText" for route compatibility
+                metadata,
+                forms,
+                navigation,
+                rawText: cleanText
             };
         } catch (error) {
             return {
@@ -180,45 +238,27 @@ class ScraperService {
             throw new Error("Invalid protocol. Only HTTP/HTTPS allowed.");
         }
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
-
         try {
-            // 2. Fetch with Timeout
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    "User-Agent": "ChatbotKnowledgeBot/1.0"
-                }
-            });
+            // Re-use scrapeWebsite for consistency and robustness
+            // Note: `scrapeWebsite` returns clean body text in `rawText`
+            const result = await this.scrapeWebsite(url);
 
-            // 3. Validate Content Type
-            const contentType = response.headers.get("content-type") || "";
-            if (!contentType.includes("text/html")) {
-                throw new Error(`Invalid content-type: ${contentType}. Only text/html allowed.`);
+            if (!result.success) {
+                console.error(`Scrape failed for ${url}:`, result.error);
+                throw new Error(result.error || "Scraping failed");
             }
-
-            // 4. Size Check (Stream reading or buffer check)
-            // For simplicity in Node 18+, we can grab text but check length
-            const html = await response.text();
-
-            if (html.length > this.MAX_SIZE_BYTES) {
-                throw new Error(`Content too large (${html.length} bytes). Limit is ${this.MAX_SIZE_BYTES}.`);
-            }
-
-            // 5. Clean / Extract Text
-            const cleaned = this._cleanHTML(html);
 
             return {
-                rawText: html, // Optional storage? Plan says optional but model has it. Storing for audit.
-                cleanedText: cleaned
+                rawText: result.rawText,
+                cleanedText: result.rawText,
+                metadata: result.metadata,
+                forms: result.forms,
+                navigation: result.navigation
             };
 
         } catch (error) {
-            if (error.name === 'AbortError') throw new Error("Request timed out (5s limit).");
+            console.error(`IngestURL Error for ${url}:`, error.message);
             throw error;
-        } finally {
-            clearTimeout(timeout);
         }
     }
 

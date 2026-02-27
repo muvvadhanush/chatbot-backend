@@ -110,6 +110,7 @@ router.get('/:id/discovery/results', async (req, res) => {
 router.post('/:id/discovery/approve-all', async (req, res) => {
     try {
         const { id } = req.params;
+        console.log(`[APPROVE-ALL] Starting for ${id}`);
 
         // 1. Get Discovered URLs
         const discovered = await ConnectionDiscovery.findAll({
@@ -117,7 +118,10 @@ router.post('/:id/discovery/approve-all', async (req, res) => {
             limit: 10 // Analyze top 10 pages for brand detection
         });
 
+        console.log(`[APPROVE-ALL] Found ${discovered.length} rows for ${id}`);
+
         if (discovered.length === 0) {
+            console.warn(`[APPROVE-ALL] No DISCOVERED items found for ${id}`);
             return res.json({ success: true, count: 0, message: "No items to approve" });
         }
 
@@ -127,37 +131,63 @@ router.post('/:id/discovery/approve-all', async (req, res) => {
         const Connection = require('../models/Connection'); // For association check
 
         let extractedCount = 0;
+        console.log(`[APPROVE-ALL] Processing ${discovered.length} items...`);
 
         // Parallel processing with limit?
         // Let's do sequential for safety/simplicity in this route or Promise.all
         const results = await Promise.all(discovered.map(async (item) => {
             try {
+                console.log(`[APPROVE-ALL] Scraping: ${item.discoveredUrl}`);
                 // Scrape
                 const scrapeResult = await scraperService.scrapeWebsite(item.discoveredUrl);
                 if (scrapeResult.success) {
-                    // Save to PageContent
-                    await PageContent.create({
-                        connectionId: id,
-                        url: item.discoveredUrl,
-                        status: 'COMPLETED',
-                        rawHtml: 'SKIPPED_FOR_DB_SIZE', // Optimize storage
-                        cleanText: scrapeResult.rawText, // Use rawText as cleanText for now
-                        contentHash: require('crypto').createHash('sha256').update(scrapeResult.rawText).digest('hex'),
-                        wordCount: scrapeResult.rawText.split(/\s+/).length,
-                        fetchedAt: new Date()
-                    });
+                    const text = scrapeResult.rawText || '';
+                    console.log(`[APPROVE-ALL] Scrape SUCCESS for ${item.discoveredUrl} (${text.length} chars)`);
 
-                    // Update Discovery Status
-                    await item.update({ status: 'APPROVED' });
-                    return 1;
+                    // Save to PageContent (Upsert to avoid unique constraint issues)
+                    const contentHash = require('crypto').createHash('sha256').update(text).digest('hex');
+                    const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+
+                    try {
+                        await PageContent.upsert({
+                            connectionId: id,
+                            url: item.discoveredUrl,
+                            status: 'FETCHED',
+                            rawHtml: 'SKIPPED_FOR_DB_SIZE',
+                            cleanText: text,
+                            contentHash: contentHash,
+                            wordCount: wordCount,
+                            fetchedAt: new Date()
+                        });
+
+                        console.log(`[APPROVE-ALL] Persistence SUCCESS for ${item.discoveredUrl}`);
+
+                        // Update Discovery Status
+                        await item.update({ status: 'INDEXED' });
+                        return 1;
+                    } catch (dbErr) {
+                        console.error(`[APPROVE-ALL] DB Error for ${item.discoveredUrl}:`, dbErr.message);
+                        return 0;
+                    }
+                } else {
+                    console.error(`[APPROVE-ALL] Scrape FAILED for ${item.discoveredUrl}: ${scrapeResult.error}`);
+                    await item.update({ status: 'FAILED' });
                 }
             } catch (e) {
-                console.error(`Failed to extract ${item.discoveredUrl}:`, e.message);
+                console.error(`[APPROVE-ALL] Critical Failure ${item.discoveredUrl}:`, e.message);
             }
             return 0;
         }));
 
         extractedCount = results.reduce((a, b) => a + b, 0);
+        console.log(`[APPROVE-ALL] Extraction finished. Count: ${extractedCount}/${discovered.length}`);
+
+        if (extractedCount === 0) {
+            return res.status(400).json({
+                success: false,
+                error: "Could not scrape any pages. Please ensure URLs are public and accessible."
+            });
+        }
 
         // 3. Enable Extraction on Connection if not already
         const conn = await Connection.findOne({

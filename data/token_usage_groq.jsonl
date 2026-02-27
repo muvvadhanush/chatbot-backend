@@ -1,0 +1,1 @@
+{"timestamp":"2026-02-19T07:14:54.685Z","connectionId":"TEST_CONN","provider":"groq","model":"llama3-70b","usage":{"total_tokens":200,"prompt_tokens":100,"completion_tokens":100},"context":"test","costEstimate":0}

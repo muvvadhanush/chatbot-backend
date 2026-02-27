@@ -2,40 +2,32 @@ const { DataTypes } = require("sequelize");
 const sequelize = require("../config/db");
 
 const Connection = sequelize.define("Connection", {
+
   connectionId: {
     type: DataTypes.STRING,
-    // unique: true, -- Removed to fix ER_TOO_MANY_KEYS
-    allowNull: false
+    primaryKey: true
   },
 
-  connectionSecret: {
+  // Store ONLY hash
+  connectionSecretHash: {
     type: DataTypes.STRING,
-    allowNull: true // Transition to passwordHash
+    allowNull: true
   },
 
   websiteName: DataTypes.STRING,
+
   websiteUrl: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  websiteDescription: DataTypes.TEXT,
-  logoUrl: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    comment: "Extracted or uploaded branding logo URL"
-  },
 
-  // Branding (Phase 10)
-  faviconPath: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    comment: "Local path to favicon icon"
-  },
-  logoPath: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    comment: "Local path to branding logo"
-  },
+  websiteDescription: DataTypes.TEXT,
+
+  logoUrl: DataTypes.STRING,
+
+  faviconPath: DataTypes.STRING,
+  logoPath: DataTypes.STRING,
+
   brandingStatus: {
     type: DataTypes.ENUM('PENDING', 'READY', 'PARTIAL', 'FAILED'),
     defaultValue: 'PENDING'
@@ -46,19 +38,23 @@ const Connection = sequelize.define("Connection", {
     defaultValue: "AI Assistant"
   },
 
-  tone: {
+  responseLength: {
     type: DataTypes.STRING,
-    defaultValue: "professional"
+    defaultValue: "medium"
   },
 
-  // 👇 IMPORTANT FOR SECURITY
+  temperature: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0.3
+  },
+
   allowedDomains: {
-    type: DataTypes.JSON, // ["http://localhost:3000", "https://mydomain.com"]
-    allowNull: true
+    type: DataTypes.JSONB,
+    defaultValue: []
   },
 
   theme: {
-    type: DataTypes.JSON,
+    type: DataTypes.JSONB,
     defaultValue: {
       primary: "#4f46e5",
       background: "#ffffff",
@@ -66,24 +62,11 @@ const Connection = sequelize.define("Connection", {
     }
   },
 
-  // Universal AI Assistant fields
-  systemPrompt: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: "Custom AI instructions for this website"
-  },
-
-  knowledgeBase: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: "FAQs, product info, company details for AI context"
-  },
+  systemPrompt: DataTypes.TEXT,
 
   extractedTools: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: [],
-    comment: "Tools automatically discovered from the website (forms, navigation)"
+    type: DataTypes.JSONB,
+    defaultValue: []
   },
 
   welcomeMessage: {
@@ -92,69 +75,72 @@ const Connection = sequelize.define("Connection", {
   },
 
   capabilities: {
-    type: DataTypes.JSON,
-    defaultValue: ["general"],
-    comment: "e.g. ['support', 'sales', 'booking']"
+    type: DataTypes.JSONB,
+    defaultValue: ["general"]
   },
 
-  // Phase 5: Generic Action Configuration
   actionConfig: {
-    type: DataTypes.JSON,
-    defaultValue: {
-      type: "SAVE",
-      config: { target: "ideas_table" }
-    },
-    comment: "Defines what happens after flow completion: { type: 'WEBHOOK'|'SAVE'|'EMAIL'|'NONE', config: {} }"
+    type: DataTypes.JSONB,
+    defaultValue: { type: "SAVE", config: {} }
   },
 
-  // Phase 6: Granular Permissions
   permissions: {
-    type: DataTypes.JSON, // { modes: [], actions: [], aiEnabled: true }
+    type: DataTypes.JSONB,
     defaultValue: {
-      modes: ["FREE_CHAT"], // Default: No Guided Flow
-      actions: ["SAVE"],    // Default: Save only
+      modes: ["FREE_CHAT"],
+      actions: ["SAVE"],
       aiEnabled: true
-    },
-    comment: "Explicitly allowed modes and actions"
+    }
   },
 
-  // Step 1: Website Behavior Engine
   behaviorProfile: {
-    type: DataTypes.JSON,
-    defaultValue: {
-      assistantRole: "support_agent",
-      tone: "neutral",
-      responseLength: "medium",
-      salesIntensity: 0.0,
-      empathyLevel: 0.5,
-      primaryGoal: "support",
-      hardConstraints: {
-        never_claim: [],
-        escalation_path: "human_support"
-      }
-    },
-    comment: "Controls how the bot thinks and responds globally"
+    type: DataTypes.JSONB,
+    defaultValue: {}
   },
 
   behaviorOverrides: {
-    type: DataTypes.JSON,
-    defaultValue: [], // Array of { match: "/path", overrides: {} }
-    comment: "Page-level rules that override the global behavior profile"
+    type: DataTypes.JSONB,
+    defaultValue: []
   },
-  // --- Phase 1: Secure Handshake & Extraction ---
+
   passwordHash: {
     type: DataTypes.STRING,
-    allowNull: true, // Transitioning existing connections
+    allowNull: true
   },
 
   status: {
-    type: DataTypes.ENUM('CREATED', 'CONNECTED', 'EXTRACTION_REQUESTED', 'READY', 'FAILED'),
-    defaultValue: 'CREATED'
+    type: DataTypes.ENUM('DRAFT', 'CONNECTED', 'DISCOVERING', 'TRAINED', 'TUNED', 'READY', 'LAUNCHED'),
+    defaultValue: 'DRAFT'
   },
 
-  widgetSeen: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+  onboardingStep: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    comment: 'Current wizard step (1-6)'
+  },
+
+  onboardingCompletedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Timestamp when onboarding reached LAUNCHED'
+  },
+
+  version: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: 'Optimistic locking counter for race condition safety'
+  },
+
+  stateLockedBy: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Job name holding the state lock (e.g. discovery:job-abc)'
+  },
+
+  stateLockedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When the state lock was acquired'
   },
 
   extractionEnabled: {
@@ -162,26 +148,54 @@ const Connection = sequelize.define("Connection", {
     defaultValue: false
   },
 
-  allowedExtractors: {
-    type: DataTypes.JSON, // ["branding", "knowledge", "forms"]
+  policies: {
+    type: DataTypes.JSONB,
     defaultValue: []
   },
 
-  extractionToken: {
-    type: DataTypes.STRING,
-    allowNull: true
+  widgetConfig: {
+    type: DataTypes.JSONB,
+    defaultValue: {}
   },
 
-  extractionTokenExpires: {
+  healthScore: {
+    type: DataTypes.FLOAT,
+    defaultValue: 100.0
+  },
+
+  driftCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+
+  confidenceGateStatus: {
+    type: DataTypes.ENUM('ACTIVE', 'WARNING', 'FAILED'),
+    defaultValue: 'ACTIVE'
+  },
+
+  lastActivityAt: {
     type: DataTypes.DATE,
-    allowNull: true
+    defaultValue: DataTypes.NOW
   },
 
-  // Phase 3.3: Policy-Driven AI
-  policies: {
-    type: DataTypes.JSON,
-    defaultValue: [] // Array of policy strings
+  launchStatus: {
+    type: DataTypes.ENUM('DRAFT', 'LAUNCHED'),
+    defaultValue: 'DRAFT'
+  },
+
+  onboardingMeta: {
+    type: DataTypes.JSONB,
+    defaultValue: {},
+    comment: 'Stores per-step metadata like discoveryState, training stats'
   }
+
+}, {
+  indexes: [
+    { unique: true, fields: ['connectionId'] },
+    { fields: ['status'] },
+    { fields: ['launchStatus'] },
+    { fields: ['lastActivityAt'] }
+  ]
 });
 
 module.exports = Connection;

@@ -16,7 +16,7 @@ const ManualUpload = sequelize.define("ManualUpload", {
         allowNull: false
     },
     fileType: {
-        type: DataTypes.ENUM('PDF', 'DOCX', 'TXT'),
+        type: DataTypes.ENUM('PDF', 'DOCX', 'TEXT'),
         allowNull: false
     },
     rawText: {

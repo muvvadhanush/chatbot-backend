@@ -2,15 +2,21 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const sequelize = require('../config/db');
 
-// Import models to ensure they are attached to Sequelize instance
-const Connection = require('../models/Connection');
-const ConnectionKnowledge = require('../models/ConnectionKnowledge');
-const ChatSession = require('../models/ChatSession');
-const Idea = require('../models/Idea');
-
-// Replicate associations from app.js (important for ForeignKey constraints)
-Connection.hasMany(ConnectionKnowledge, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-ConnectionKnowledge.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
+// Import models from index to get all entities and associations
+const {
+    Connection,
+    ConnectionKnowledge,
+    ChatSession,
+    MissedQuestion,
+    PendingExtraction,
+    ConfidencePolicy,
+    ConnectionDiscovery,
+    ConnectionCrawlSession,
+    ManualUpload,
+    PageContent,
+    User,
+    ButtonSet
+} = require('../models');
 
 async function runSync() {
     try {

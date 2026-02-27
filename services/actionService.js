@@ -35,6 +35,9 @@ class ActionService {
                 case "EMAIL":
                     return await this.handleEmail(config, payload);
 
+                case "SLACK":
+                    return await this.handleSlack(config, payload);
+
                 case "NONE":
                 default:
                     console.log("ℹ️ No action configured.");
@@ -76,6 +79,16 @@ class ActionService {
         console.log("📧 [STUB] Sending Email to:", config?.email || "admin@example.com");
         console.log("📝 Content:", JSON.stringify(payload, null, 2));
         return { success: true, message: "Email queued." };
+    }
+
+    async handleSlack(config, payload) {
+        if (!config || !config.url) throw new Error("Missing Slack Webhook URL");
+
+        const slackService = require('./integrations/slackService');
+
+        const message = `🚀 *New Bot Action* (${payload.sessionId})\n*Connection:* ${payload.connectionId}\n*Data:* ${JSON.stringify(payload.data || payload)}`;
+
+        return await slackService.sendSlackAlert(config.url, message);
     }
 }
 

@@ -4,6 +4,7 @@ const ChatSession = require("../models/ChatSession");
 const Connection = require("../models/Connection");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
 const PendingExtraction = require("../models/PendingExtraction");
+const MissedQuestion = require("../models/MissedQuestion");
 const connectionController = require("../controllers/connectionController");
 
 const authorize = require("../middleware/rbac");
@@ -12,17 +13,36 @@ const basicAuth = require("../middleware/auth");
 // Existing Analytics Route
 router.get("/analytics", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), async (req, res) => {
     try {
-        const sessions = await ChatSession.findAll();
+        // Parallel Fetch for Performance
+        const [totalConnections, totalSessions, totalKnowledge, missedGaps, sessions] = await Promise.all([
+            Connection.count(),
+            ChatSession.count(),
+            ConnectionKnowledge.count(),
+            MissedQuestion.count({ where: { status: 'PENDING' } }),
+            ChatSession.findAll({ limit: 50, order: [['updatedAt', 'DESC']] }) // Sample for health
+        ]);
 
-        // Calculate At-Risk (Global & Per Connection)
+        let totalTokens = 0;
         let atRiskCount = 0;
-        const riskMap = {}; // connectionId -> count
+        const riskMap = {};
+        let totalMsgCount = 0;
+        const confidenceScores = [];
 
         sessions.forEach(s => {
             const msgs = s.messages || [];
+            totalMsgCount += msgs.length;
+
             msgs.forEach(m => {
                 if (m.role === 'assistant' && m.ai_metadata) {
-                    if ((m.ai_metadata.confidenceScore || 1) < 0.7) {
+                    const tokens = m.ai_metadata.totalTokens || m.ai_metadata.usage?.total_tokens || 0;
+                    totalTokens += tokens;
+
+                    const conf = m.ai_metadata.confidenceScore;
+                    if (conf !== undefined && conf !== null) {
+                        confidenceScores.push(conf);
+                    }
+
+                    if ((m.ai_metadata.confidenceScore || 1) < 0.65) {
                         atRiskCount++;
                         riskMap[s.connectionId] = (riskMap[s.connectionId] || 0) + 1;
                     }
@@ -30,11 +50,28 @@ router.get("/analytics", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), as
             });
         });
 
+        // FIX: Compute avgMessages and avgConfidence for frontend analytics view
+        const avgMessages = sessions.length > 0 ? totalMsgCount / sessions.length : 0;
+        const avgConfidence = confidenceScores.length > 0
+            ? confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length
+            : 0;
+
+        // Heuristic: Health starts at 100, drops by 5 for every at-risk interaction in sample
+        const healthScore = Math.max(0, 100 - (atRiskCount * 2));
+        const estimatedCost = (totalTokens / 1000) * 0.02; // Roughly $0.02 per 1k tokens (GPT-4o avg)
+
         res.json({
-            totalSessions: sessions.length,
-            totalMessages: sessions.reduce((a, s) => a + s.messages.length, 0),
+            totalConnections,
+            totalSessions,
+            totalKnowledge,
+            pendingGaps: missedGaps,
+            healthScore,
+            totalTokens,
+            estimatedCost: estimatedCost.toFixed(2),
             globalAtRiskCount: atRiskCount,
-            riskMap: riskMap
+            riskMap: riskMap,
+            avgMessages,
+            avgConfidence
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -210,6 +247,47 @@ router.post("/chat-sessions/:sessionId/messages/:index/feedback", basicAuth, aut
     }
 });
 
+// Gap Closure: Update Widget Config
+router.patch("/connections/:connectionId/config", basicAuth, authorize(['EDITOR', 'OWNER']), async (req, res) => {
+    try {
+        const { connectionId } = req.params;
+        const configUpdates = req.body; // Partial updates allowed
+
+        const connection = await Connection.findOne({ where: { connectionId } });
+        if (!connection) return res.status(404).json({ error: "Connection not found" });
+
+        // Merge existing config with updates
+        const currentConfig = connection.widgetConfig || {
+            primaryColor: "#4f46e5",
+            launcherIcon: "DEFAULT",
+            botAvatar: "DEFAULT",
+            title: "AI Assistant",
+            welcomeMessage: "Hi! How can I help you today?",
+            timeOnPage: 0,
+            pageUrl: "",
+            socialLinks: []
+        };
+
+        connection.widgetConfig = {
+            ...currentConfig,
+            ...configUpdates
+        };
+
+        // If specific fields are updated, we can also sync to top-level fields (optional)
+        // e.g., if config.title changes, update connection.assistantName?
+        // For now, keep them separate or sync:
+        if (configUpdates.title) connection.assistantName = configUpdates.title;
+
+        await connection.save();
+
+        res.json({ success: true, config: connection.widgetConfig });
+
+    } catch (error) {
+        console.error("Config Update Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 1.7.4 Admin Trigger Extraction (Wizard)
 router.post("/connections/:connectionId/extract", basicAuth, authorize(['EDITOR', 'OWNER']), async (req, res) => {
     try {
@@ -221,36 +299,61 @@ router.post("/connections/:connectionId/extract", basicAuth, authorize(['EDITOR'
         const scraperService = require("../services/scraperService");
 
         // 1. Scrape
-        const result = await scraperService.scrapeWebsite(url);
-        if (!result.success) throw new Error(result.error);
+        const { metadata, forms, navigation, rawText, success, error: scrapeError } = await scraperService.scrapeWebsite(url);
+        if (!success) throw new Error(scrapeError);
 
         // 2. Create Pending Extractions
 
         // A. Metadata Proposal
-        if (result.metadata && (result.metadata.title || result.metadata.description)) {
+        if (metadata && (metadata.title || metadata.description)) {
             await PendingExtraction.create({
                 connectionId,
                 extractorType: 'METADATA',
                 status: 'PENDING',
-                confidenceScore: 0.9,
-                rawData: {
-                    websiteName: result.metadata.title,
-                    websiteDescription: result.metadata.description
-                },
+                confidenceScore: 0.95,
+                rawData: metadata, // Store full metadata object
                 metadata: { sourceUrl: url }
             });
         }
 
-        // B. Knowledge Proposal
-        if (result.rawText && result.rawText.length > 50) {
+        // B. Forms Proposal
+        if (forms && forms.length > 0) {
+            for (const form of forms) {
+                await PendingExtraction.create({
+                    connectionId,
+                    extractorType: 'FORM',
+                    status: 'PENDING',
+                    confidenceScore: 0.9,
+                    rawData: form,
+                    metadata: { sourceUrl: url }
+                });
+            }
+        }
+
+        // C. Navigation Proposal
+        if (navigation && navigation.length > 0) {
+            // Group navigation into one record or multiple? 
+            // Better to grouping to avoid spam.
+            await PendingExtraction.create({
+                connectionId,
+                extractorType: 'NAVIGATION',
+                status: 'PENDING',
+                confidenceScore: 0.85,
+                rawData: { links: navigation },
+                metadata: { sourceUrl: url, count: navigation.length }
+            });
+        }
+
+        // D. Knowledge Proposal
+        if (rawText && rawText.length > 50) {
             await PendingExtraction.create({
                 connectionId,
                 extractorType: 'KNOWLEDGE',
                 status: 'PENDING',
                 confidenceScore: 0.85,
                 rawData: {
-                    title: result.metadata.title || "Scraped Content",
-                    content: result.rawText,
+                    title: metadata.title || "Scraped Content",
+                    content: rawText,
                     url: url
                 },
                 metadata: { sourceUrl: url }
@@ -261,6 +364,43 @@ router.post("/connections/:connectionId/extract", basicAuth, authorize(['EDITOR'
 
     } catch (error) {
         console.error("Extraction Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- Phase 3: AI Intelligence (Missed Questions) ---
+router.get("/connections/:connectionId/missed-questions", basicAuth, authorize(['VIEWER', 'EDITOR', 'OWNER']), async (req, res) => {
+    try {
+        const { connectionId } = req.params;
+        const { status } = req.query;
+
+        const where = { connectionId };
+        if (status) where.status = status;
+
+        const missed = await MissedQuestion.findAll({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json(missed);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.patch("/missed-questions/:id", basicAuth, authorize(['EDITOR', 'OWNER']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const missed = await MissedQuestion.findOne({ where: { id } });
+        if (!missed) return res.status(404).json({ error: "Missed question not found" });
+
+        if (status) missed.status = status;
+        await missed.save();
+
+        res.json({ success: true, status: missed.status });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });

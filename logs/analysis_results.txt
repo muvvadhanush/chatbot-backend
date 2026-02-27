@@ -1,0 +1,130 @@
+﻿
+combined.log:312:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"S
+YSTEM","model":"llama-3.3-70b-versati
+le","tokens":188,"type":"billing"},"t
+imestamp":"2026-02-16 12:45:11"}
+combined.log:323:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":186,"type":"billi
+ng"},"timestamp":"2026-02-16 
+12:45:35"}
+combined.log:330:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":244,"type":"billi
+ng"},"timestamp":"2026-02-16 
+12:45:47"}
+combined.log:336:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":335,"type":"billi
+ng"},"timestamp":"2026-02-16 
+12:46:07"}
+combined.log:730:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"S
+YSTEM","model":"llama-3.3-70b-versati
+le","tokens":195,"type":"billing"},"t
+imestamp":"2026-02-16 15:05:28"}
+combined.log:754:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":178,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:07:03"}
+combined.log:762:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":458,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:07:14"}
+combined.log:792:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"S
+YSTEM","model":"llama-3.3-70b-versati
+le","tokens":183,"type":"billing"},"t
+imestamp":"2026-02-16 15:13:56"}
+combined.log:808:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mlozlevu","model":"llama-3.3-70b-
+versatile","tokens":178,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:15:15"}
+combined.log:813:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mlozlevu","model":"llama-3.3-70b-
+versatile","tokens":243,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:15:23"}
+combined.log:833:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mlozlevu","model":"llama-3.3-70b-
+versatile","tokens":178,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:16:52"}
+combined.log:839:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mlozlevu","model":"llama-3.3-70b-
+versatile","tokens":215,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:17:00"}
+combined.log:853:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":178,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:17:34"}
+combined.log:859:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":239,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:17:41"}
+combined.log:880:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":448,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:20:23"}
+combined.log:888:{"level":"info","mes
+sage":"TOKEN_USAGE: llama-3.3-70b-ver
+satile","metadata":{"connectionId":"c
+onn_mloua6ti","model":"llama-3.3-70b-
+versatile","tokens":761,"type":"billi
+ng"},"timestamp":"2026-02-16 
+15:21:09"}
+combined.log:1598:{"level":"info","me
+ssage":"TOKEN_USAGE: llama-3.3-70b-ve
+rsatile","metadata":{"connectionId":"
+SYSTEM","model":"llama-3.3-70b-versat
+ile","tokens":190,"type":"billing"},"
+timestamp":"2026-02-17 11:41:01"}
+combined.log:1669:{"level":"info","me
+ssage":"TOKEN_USAGE: llama-3.3-70b-ve
+rsatile","metadata":{"connectionId":"
+SYSTEM","model":"llama-3.3-70b-versat
+ile","tokens":187,"type":"billing"},"
+timestamp":"2026-02-17 11:51:20"}
+combined.log:1725:{"level":"info","me
+ssage":"TOKEN_USAGE: llama-3.3-70b-ve
+rsatile","metadata":{"connectionId":"
+SYSTEM","model":"llama-3.3-70b-versat
+ile","tokens":189,"type":"billing"},"
+timestamp":"2026-02-17 12:09:35"}
+
+

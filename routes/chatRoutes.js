@@ -1,51 +1,116 @@
 const express = require("express");
 const router = express.Router();
-const aiService = require("../services/aiservice");
-const ChatSession = require("../models/ChatSession");
-const Connection = require("../models/Connection");
 
-console.log("🔥 chatRoutes.js LOADED");
-
-// Main chat endpoint
-// Main chat endpoint
+const limiters = require("../middleware/rateLimiter");
 const chatController = require("../controllers/chatController");
-router.post("/send", chatController.sendMessage);
-router.post("/feedback", chatController.submitFeedback);
+const Connection = require("../models/Connection");
+const { URL } = require("url");
 
-// Get welcome message for a connection
-router.get("/welcome/:connectionId", async (req, res) => {
-    try {
-        const connection = await Connection.findOne({
-            where: { connectionId: req.params.connectionId }
-        });
+// ===============================
+// 1️⃣ Chat Endpoints
+// ===============================
 
-        if (!connection) {
-            return res.status(404).json({ error: "Connection not found" });
-        }
+// Basic health test
+router.post("/chat", chatController.handleChat);
 
-        // --- SECURITY: DOMAIN LOCKING ---
-        const origin = req.headers.origin || req.headers.referer;
-        if (connection.allowedDomains && connection.allowedDomains.length > 0) {
-            const domains = Array.isArray(connection.allowedDomains) ? connection.allowedDomains : [connection.allowedDomains];
-            const isAllowed = domains.includes('*') ||
-                (origin && domains.some(d => origin.includes(d.replace(/^https?:\/\//, ''))));
+// Main chat endpoint
+router.post(
+    "/send",
+    limiters.widgetChat,
+    chatController.sendMessage
+);
 
-            if (!isAllowed) {
-                return res.status(403).json({ error: "This domain is not authorized." });
+// ===============================
+// 2️⃣ Welcome Endpoint (Widget)
+// ===============================
+router.get(
+    "/welcome/:connectionId",
+    limiters.widgetChat,
+    async (req, res) => {
+        try {
+            const { connectionId } = req.params;
+
+            if (!connectionId || connectionId.length > 64) {
+                return res
+                    .status(400)
+                    .json({ error: "INVALID_CONNECTION_ID" });
             }
+
+            const connection = await Connection.findOne({
+                where: { connectionId }
+            });
+
+            if (!connection) {
+                return res
+                    .status(404)
+                    .json({ error: "Connection not found" });
+            }
+
+            // ===== Secure Domain Validation =====
+            const originHeader =
+                req.headers.origin || req.headers.referer;
+
+            if (connection.allowedDomains) {
+                let domains = connection.allowedDomains;
+
+                if (typeof domains === "string") {
+                    try {
+                        domains = JSON.parse(domains);
+                    } catch {
+                        domains = [domains];
+                    }
+                }
+
+                if (!Array.isArray(domains)) {
+                    domains = [domains];
+                }
+
+                if (!domains.includes("*")) {
+                    if (!originHeader) {
+                        return res.status(403).json({
+                            error: "DOMAIN_NOT_ALLOWED"
+                        });
+                    }
+
+                    const requestHost =
+                        new URL(originHeader).hostname;
+
+                    const isAllowed = domains.some((allowed) => {
+                        try {
+                            const allowedHost = new URL(
+                                allowed.startsWith("http")
+                                    ? allowed
+                                    : `https://${allowed}`
+                            ).hostname;
+
+                            return requestHost === allowedHost;
+                        } catch {
+                            return false;
+                        }
+                    });
+
+                    if (!isAllowed) {
+                        return res.status(403).json({
+                            error: "DOMAIN_NOT_ALLOWED"
+                        });
+                    }
+                }
+            }
+
+            return res.json({
+                welcomeMessage: connection.welcomeMessage,
+                assistantName: connection.assistantName,
+                theme: connection.theme,
+                logoUrl: connection.logoUrl
+            });
+
+        } catch (error) {
+            console.error("❌ Welcome error:", error);
+            return res.status(500).json({
+                error: "INTERNAL_SERVER_ERROR"
+            });
         }
-
-        return res.json({
-            welcomeMessage: connection.welcomeMessage,
-            assistantName: connection.assistantName,
-            theme: connection.theme,
-            logoUrl: connection.logoUrl
-        });
-
-    } catch (error) {
-        console.error("❌ Welcome error:", error);
-        return res.status(500).json({ error: "Server error" });
     }
-});
+);
 
 module.exports = router;

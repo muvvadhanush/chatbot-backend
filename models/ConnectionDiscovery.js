@@ -24,7 +24,7 @@ const ConnectionDiscovery = sequelize.define('ConnectionDiscovery', {
         defaultValue: 0
     },
     status: {
-        type: DataTypes.ENUM('DISCOVERED', 'FILTERED', 'INDEXED', 'FAILED'),
+        type: DataTypes.ENUM('DISCOVERED', 'FILTERED', 'INDEXED', 'APPROVED', 'FAILED'),
         defaultValue: 'DISCOVERED'
     },
     httpStatus: {

@@ -1,189 +1,143 @@
-const dns = require('dns');
-// Force IPv4 to avoid ENOTFOUND on some Windows/Node setups with Supabase
+// ===== DNS IPv4 Enforcement ===== // Restart 2
+const dns = require("dns");
 try {
-  dns.setDefaultResultOrder('ipv4first');
-} catch (e) {
-  // ignore
-}
+  dns.setDefaultResultOrder("ipv4first");
+} catch (e) { }
 
+// ===== Global Process Safety =====
 process.on("uncaughtException", (err) => {
   console.error("🔥 UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
   console.error("🔥 UNHANDLED REJECTION:", reason);
+  process.exit(1);
 });
 
+// ===== Core Imports =====
 require("dotenv").config();
-const settings = require("./config/settings");
-const logger = require("./utils/logger");
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
+const settings = require("./config/settings");
+const logger = require("./utils/logger");
 const sequelize = require("./config/db");
-const chatRoutes = require("./routes/chatRoutes");
-const connectionRoutes = require("./routes/connectionRoutes");
-const widgetRoutes = require("./routes/widgetRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const Idea = require("./models/Idea");
-const Connection = require("./models/Connection");
-const ConnectionKnowledge = require("./models/ConnectionKnowledge");
-const PendingExtraction = require("./models/PendingExtraction");
-const User = require("./models/User");
-const ConnectionCrawlSession = require("./models/ConnectionCrawlSession");
-const ConnectionDiscovery = require("./models/ConnectionDiscovery");
+require("./models"); // Initialize Associations
 
-// Associations
-Connection.hasMany(ConnectionKnowledge, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-ConnectionKnowledge.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
-Connection.hasMany(PendingExtraction, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-PendingExtraction.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
-
-Connection.hasMany(ConnectionCrawlSession, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-ConnectionCrawlSession.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
-
-Connection.hasMany(ConnectionDiscovery, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-ConnectionDiscovery.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
-
-const PageContent = require("./models/PageContent");
-const ManualUpload = require("./models/ManualUpload");
-
-// PageContent Associations
-Connection.hasMany(PageContent, { foreignKey: 'connectionId', sourceKey: 'connectionId' });
-PageContent.belongsTo(Connection, { foreignKey: 'connectionId', targetKey: 'connectionId' });
-
-// PendingExtraction Association to PageContent
-// PendingExtraction Association to PageContent
-PageContent.hasMany(PendingExtraction, { foreignKey: 'pageContentId', sourceKey: 'id' });
-PendingExtraction.belongsTo(PageContent, { foreignKey: 'pageContentId', targetKey: 'id' });
-
+// ===== Initialize App =====
 const app = express();
 
-// 2.1 Request Id & Logging (PR-5)
+// ===== Request ID + Logging =====
 const requestLogger = require("./middleware/requestLogger");
 app.use(requestLogger);
 
-// CORS - Allow all origins with explicit headers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('X-Content-Type-Options', 'nosniff');
+// ===== Secure CORS Configuration =====
+const allowedOrigins = settings.allowedOrigins || [];
 
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || settings.env === 'development') return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    logger.warn(`CORS Blocked: Origin "${origin}" is not in allowed list.`, { allowedOrigins });
+    return callback(new Error("CORS_NOT_ALLOWED"));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// Security Headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://cdn-icons-png.flaticon.com", "https://*.flaticon.com"],
+      connectSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow widget to be loaded by other sites
+}));
+app.use((req, res, next) => {
+  // Custom headers if needed (Helmet covers most)
+  res.setHeader("X-Content-Type-Options", "nosniff");
   next();
 });
 
-app.use(express.json());
+// ===== Body Parser =====
+app.use(express.json({ limit: "1mb" }));
 
-// 4. Standard Error Handler (Must be last)
-const errorHandler = require("./middleware/errorHandler");
-// We need to mount this AFTER all routes. so I will place it at the end of the file.
-// But wait, the JSON error handler should be early?
-// The user instruction said "Create standardized error responses".
-// The existing JSON error handler was for syntax errors. My new handler covers that.
-// But middleware order matters. 
-// Standard error handler usually goes at the *end*.
-// Middleware for catching 404s goes before it.
-// JSON parser is early. If it fails, it calls next(err).
-// So I should put errorHandler at the very end of app.js.
+// ===== Static Files =====
+app.use(express.static(path.join(__dirname, "public")));
 
-// Serve static files (widget)
-const path = require('path');
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ROOT ROUTE
+// ===== Root Redirect =====
 app.get("/", (req, res) => {
   res.redirect("/admin");
 });
 
-const limiters = require("./middleware/rateLimiter");
+// ===== Health Endpoint =====
+const rateLimiter = require("./middleware/rateLimiter");
 
-// ROUTES
-// 1. Internal / Health
-app.get("/health", limiters.systemHealth, (req, res) => {
+app.get("/health", rateLimiter.systemHealth || ((req, res, next) => next()), (req, res) => {
   res.status(200).json({
     status: "ok",
     service: "chatbot-backend",
+    environment: settings.env,
     timestamp: new Date().toISOString(),
   });
 });
 
-// 2. V1 API Router
+// ===== API Versioning =====
 const v1Router = require("./routes/v1");
 app.use("/api/v1", v1Router);
 
-// 3. Legacy Route Warning (Blocker)
-app.use("/api", (req, res, next) => {
-  // If it didn't match /api/v1, it falls through here (or if it's /api/chat etc)
-  // But express routing matches /api/v1 first if defined first? 
-  // Actually, /api matches /api/v1 too if we aren't careful? 
-  // Express router matches strictly in order.
-  // If we mount /api/v1 First, it handles those.
-  // Then we mount /api... warning.
+// ===== Admin Panel Routes (React App) =====
+app.use(express.static(path.join(__dirname, "admin-ui", "dist")));
 
-  // Check if it's a static file or something else? No, purely API.
-  if (req.path.startsWith("/v1")) {
-    return next();
-  }
-
-  res.status(410).json({
-    error: "API_VERSION_REQUIRED",
-    message: "This API endpoint has moved. Please migrate to /api/v1"
-  });
-});
-
-// ADMIN PANEL (Protected)
-const basicAuth = require("./middleware/auth");
-app.get("/admin", basicAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "admin.html"));
-});
-
-// ERROR HANDLER (Last Middleware)
-app.use((req, res, next) => {
-  // 404 Handler
-  const requestId = req.requestId || require('uuid').v4(); // Fallback if middleware failed
+// Catch-all route to let React Router handle '/admin', '/login', etc.
+app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "admin-ui", "dist", "index.html")));
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "admin-ui", "dist", "index.html")));
+// Uses regex instead of wildcard for nested routes in static React bundle
+app.get(/^\/admin\/.*/, (req, res) => res.sendFile(path.join(__dirname, "admin-ui", "dist", "index.html")));
+app.use((req, res) => {
+  const requestId = req.requestId || uuidv4();
   logger.warn(`404 Not Found: ${req.method} ${req.originalUrl}`, { requestId });
 
   res.status(404).json({
     error: "NOT_FOUND",
     message: "Resource not found",
-    requestId: requestId
+    requestId,
   });
 });
-app.use(require("./middleware/errorHandler"));
 
-// DATABASE STARTUP & BACKGROUND SYNC
+// ===== Central Error Handler =====
+const errorHandler = require("./middleware/errorHandler");
+app.use(errorHandler);
+
+// ===== Database & Server Startup =====
 const PORT = settings.port;
 
 sequelize.authenticate()
-  .then(async () => {
+  .then(() => {
     console.log("✅ Database connected successfully.");
-
-    // Check for pending migrations
-    // In production, we assume migrations are run via deployment pipeline.
-    // Locally, we might want to warn.
-    // const { Umzug, SequelizeStorage } = require('umzug'); 
-
-    // Actually, running full umzug check here might require more deps.
-    // For now, let's just log and trust the migration process.
-    console.log("🛡️ Schema Lock Active: sequelize.sync() is DISABLED.");
+    console.log("🛡️ Schema Lock Active: sequelize.sync() DISABLED.");
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server bound to port ${PORT} [Env: ${settings.env}]`);
-      console.log(`📡 Health check: http://localhost:${PORT}/health`);
-
-      // Keep keep-alive logic?
-      // Yes, if needed.
+      console.log(`🚀 Server running on port ${PORT} [${settings.env}]`);
+      console.log(`📡 Health: http://localhost:${PORT}/health`);
     });
   })
   .catch((err) => {
     console.error("❌ Database connection failed:", err);
     process.exit(1);
   });
-
-// KEEP PROCESS ALIVE (Windows safety)
-setInterval(() => { }, 1000);

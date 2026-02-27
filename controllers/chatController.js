@@ -1,262 +1,296 @@
 const ChatSession = require("../models/ChatSession");
 const Connection = require("../models/Connection");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
-const aiService = require("../services/aiservice");
-const actionService = require("../services/actionService");
-const promptService = require("../services/promptService");
+const ConfidencePolicy = require("../models/ConfidencePolicy");
 
-// Helper to send standardized response
-const sendReply = (res, message, suggestions = [], aiMetadata = null, messageIndex = -1) => {
+const promptService = require("../services/promptService");
+const aiService = require("../services/aiService");
+const { detectKnowledgeGap } = require("../services/gapDetectionService");
+const { sendSlackAlert } = require("../services/integrations/slackService");
+
+// ===============================
+// Helper: Send Reply
+// ===============================
+const sendReply = (res, message, suggestions = [], aiMetadata = null) => {
   return res.status(200).json({
     messages: [{ role: "assistant", text: message }],
     suggestions,
-    ai_metadata: aiMetadata,
-    messageIndex
+    ai_metadata: aiMetadata
   });
 };
 
-exports.sendMessage = async (req, res) => {
+// ===============================
+// Basic Health Test Route
+// ===============================
+const handleChat = async (req, res) => {
+  try {
+    res.json({ success: true, message: "Chat route working" });
+  } catch (error) {
+    console.error("Chat Error:", error);
+    res.status(500).json({ success: false });
+  }
+};
+
+// ===============================
+// Main Chat Handler
+// ===============================
+const sendMessage = async (req, res) => {
   try {
     const { message, connectionId, sessionId, url } = req.body;
 
-    if (!message || !sessionId) {
-      return res.status(400).json({ error: "Missing message or sessionId" });
+    if (!message || !sessionId || !connectionId) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // 1. Load or Create Session
+    // Validate connection
+    const connectionObj = await Connection.findOne({ where: { connectionId } });
+    if (!connectionObj) {
+      return res.status(404).json({ error: "Invalid connection" });
+    }
+
+    // Load or create session
     let session = await ChatSession.findOne({ where: { sessionId } });
+
+    if (session && session.connectionId !== connectionId) {
+      return res.status(403).json({ error: "Session validation failed" });
+    }
 
     if (!session) {
       session = await ChatSession.create({
         sessionId,
         connectionId,
         messages: [],
-        currentStep: 'NONE',
+        currentStep: "NONE",
         tempData: {},
-        mode: 'FREE_CHAT'
+        mode: "FREE_CHAT"
       });
     }
 
-    // Ensure session.tempData is an object
-    let tempData = session.tempData || {};
-    if (typeof tempData === 'string') {
-      try { tempData = JSON.parse(tempData); } catch (e) { tempData = {}; }
-    }
-
-    // Ensure session.mode is valid
-    if (!session.mode) session.mode = 'FREE_CHAT';
-
-    let response = { text: "", suggestions: [], ai_metadata: null };
-    let nextStep = session.currentStep;
-
-    console.log(`[${session.mode}] Step: ${session.currentStep} | Input: "${message}"`);
-
-    // --- EXECUTE FREE CHAT LOGIC DIRECTLY ---
     let history = session.messages || [];
-    if (typeof history === 'string') try { history = JSON.parse(history); } catch (e) { history = []; }
-
-    // --- PERMISSION CHECK: AI ENABLED ---
-    const connectionObj = await Connection.findOne({ where: { connectionId } });
-    const perms = connectionObj ? connectionObj.permissions : null;
-
-    let permsObj = perms;
-    if (typeof perms === 'string') {
-      try { permsObj = JSON.parse(perms); } catch (e) { permsObj = {}; }
+    if (typeof history === "string") {
+      try {
+        history = JSON.parse(history);
+      } catch {
+        history = [];
+      }
     }
 
-    let aiEnabled = true; // Default
-    if (permsObj && typeof permsObj.aiEnabled !== 'undefined') {
-      aiEnabled = permsObj.aiEnabled;
+    // AI Permission Check
+    let perms = connectionObj.permissions || {};
+    if (typeof perms === "string") {
+      try {
+        perms = JSON.parse(perms);
+      } catch {
+        perms = {};
+      }
     }
 
-    console.log(`[DEBUG] Connection: ${connectionId} | AI Enabled: ${aiEnabled}`);
+    let aiReply = "AI Chat is disabled.";
+    let aiMetadata = null;
 
-    let aiReply = "I'm listening.";
-    if (aiEnabled === true || aiEnabled === "true") {
-
-      // --- STEP 1: PROMPT ASSEMBLY ---
-      const assembledPrompt = await promptService.assemblePrompt(connectionId, url, "");
+    if (perms.aiEnabled !== false) {
+      const assembledPrompt =
+        await promptService.assemblePrompt(connectionId, url, "");
 
       const aiOutput = await aiService.freeChat({
         message,
         history,
         connectionId,
-        systemPrompt: assembledPrompt
+        systemPrompt: assembledPrompt,
+        memory: session.memory
       });
 
-      // Handle Object return
-      if (typeof aiOutput === 'object' && aiOutput.reply) {
+      if (typeof aiOutput === "object") {
         aiReply = aiOutput.reply;
-        response.ai_metadata = { sources: aiOutput.sources };
+        aiMetadata = { sources: aiOutput.sources || [] };
       } else {
         aiReply = aiOutput;
       }
-    } else {
-      console.log("⛔ AI Chat Blocked.");
-      aiReply = "AI Chat is disabled.";
     }
 
-    response.text = aiReply;
-
-    // Enrich ai_metadata for behavior metrics
-    const salesPatterns = ['buy now', 'sign up', 'get started', 'free trial', 'book a demo', 'schedule a call', 'contact sales', 'pricing', 'upgrade', 'subscribe'];
-    const replyLower = (response.text || '').toLowerCase();
-    const wordCount = (response.text || '').split(/\s+/).filter(w => w).length;
-    const salesTriggerDetected = salesPatterns.some(p => replyLower.includes(p));
-
-    // Compute aggregate confidence from sources
+    // Compute Confidence
     let aggConfidence = null;
-    if (response.ai_metadata && response.ai_metadata.sources) {
-      const scores = response.ai_metadata.sources
+
+    if (aiMetadata?.sources?.length) {
+      const scores = aiMetadata.sources
         .filter(s => s.confidenceScore !== undefined)
         .map(s => s.confidenceScore);
-      if (scores.length > 0) {
-        aggConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+      if (scores.length) {
+        aggConfidence =
+          scores.reduce((a, b) => a + b, 0) / scores.length;
       }
     }
 
-    response.ai_metadata = {
-      ...(response.ai_metadata || {}),
-      responseLength: wordCount,
-      salesTriggerDetected,
-      confidenceScore: aggConfidence
-    };
-
-    // ─── CONFIDENCE GATING ─────────────────────────────────
-    const ConfidencePolicy = require('../models/ConfidencePolicy');
-    let gated = false;
-    let gateReason = null;
+    // Confidence Gating
     try {
-      const policy = await ConfidencePolicy.findOne({ where: { connectionId } });
-      if (policy) {
-        const sourceCount = (response.ai_metadata && response.ai_metadata.sources)
-          ? response.ai_metadata.sources.length : 0;
-        const conf = aggConfidence !== null ? aggConfidence : 1;
+      const policy = await ConfidencePolicy.findOne({
+        where: { connectionId }
+      });
 
-        const belowConfidence = conf < policy.minAnswerConfidence;
-        const belowSources = sourceCount < policy.minSourceCount;
+      if (policy && aggConfidence !== null) {
+        const belowConfidence =
+          aggConfidence < policy.minAnswerConfidence;
 
-        if (belowConfidence || belowSources) {
-          gated = true;
-          gateReason = belowConfidence
-            ? `Confidence ${(conf * 100).toFixed(0)}% below ${(policy.minAnswerConfidence * 100).toFixed(0)}% threshold`
-            : `Only ${sourceCount} source(s), need ${policy.minSourceCount}`;
-
-          const originalAnswer = response.text;
-          response.ai_metadata.gated = true;
-          response.ai_metadata.gateReason = gateReason;
-          response.ai_metadata.originalAnswer = originalAnswer;
+        if (belowConfidence) {
+          aiMetadata = {
+            ...(aiMetadata || {}),
+            gated: true,
+            confidenceScore: aggConfidence
+          };
 
           switch (policy.lowConfidenceAction) {
-            case 'REFUSE':
-              response.text = "I'm not fully confident in that answer yet. Let me double-check or connect you with support.";
+            case "REFUSE":
+              aiReply = "I'm not fully confident in that answer.";
               break;
-            case 'CLARIFY':
-              response.text = "I need a bit more detail to answer accurately. Could you rephrase or provide more context?";
+
+            case "CLARIFY":
+              aiReply = "Could you clarify your question?";
               break;
-            case 'ESCALATE':
-              response.text = "I'm not confident enough to answer that reliably. Would you like me to connect you to a human agent?";
+
+            case "ESCALATE":
+              aiReply = "Let me connect you to support.";
+              await sendSlackAlert(
+                process.env.SLACK_WEBHOOK,
+                `Escalation from ${connectionId}: ${message}`
+              );
               break;
-            case 'SOFT_ANSWER':
+
             default:
-              response.text = "⚠️ This may not be fully accurate, but based on available information: " + originalAnswer;
-              break;
+              aiReply =
+                "⚠️ This may not be fully accurate: " + aiReply;
           }
-          console.log(`[GATE] Response gated for ${connectionId}: ${gateReason} → ${policy.lowConfidenceAction}`);
         }
       }
-    } catch (gateErr) {
-      console.error('[GATE] Policy check error:', gateErr.message);
+    } catch (err) {
+      console.error("Confidence policy error:", err.message);
     }
-    // ─── END CONFIDENCE GATING ─────────────────────────────
+
+    // Gap Detection
+    try {
+      const slackUrl = (connectionObj.widgetConfig && connectionObj.widgetConfig.slackWebhook) || process.env.SLACK_WEBHOOK;
+      await detectKnowledgeGap({
+        connectionId,
+        query: message,
+        similarityScore: aggConfidence,
+        aiResponse: aiReply,
+        slackWebhook: slackUrl
+      });
+    } catch (gapErr) {
+      console.error("Gap detection error:", gapErr.message);
+    }
 
     // Save history
     history.push({ role: "user", text: message });
     history.push({
       role: "assistant",
-      text: response.text,
-      ai_metadata: response.ai_metadata || null
+      text: aiReply,
+      ai_metadata: aiMetadata
     });
+
     session.messages = history;
-    session.changed('messages', true);
+    session.changed("messages", true);
     await session.save();
 
-    return sendReply(res, response.text);
+    // --- PHASE 3.3: BACKGROUND MEMORY (Long-term) ---
+    if (history.length > 20) {
+      const memory = session.memory || {};
+      const lastSummaryUpdate = memory.summaryUpdatedAt ? new Date(memory.summaryUpdatedAt) : 0;
 
-    // --- STATE MACHINE REMOVED (Idea Feature Deleted) ---
+      // Only summarize every 5 minutes or if no summary exists
+      if (!memory.summary || (Date.now() - lastSummaryUpdate > 300000)) {
+        aiService.summarizeHistory(history).then(async (newSummary) => {
+          if (newSummary) {
+            session.memory = {
+              ...memory,
+              summary: newSummary,
+              summaryUpdatedAt: new Date()
+            };
+            await session.save();
+            console.log(`[MEMORY] Updated summary for session ${sessionId}`);
+          }
+        }).catch(err => console.error("Background summary error:", err.message));
+      }
+    }
 
-    // 4. Send Reply
-    return sendReply(res, response.text, response.suggestions || [], response.ai_metadata);
+    // --- BUTTON SYSTEM: Trigger Matching ---
+    let matchedButtons = [];
+    let isQuickReply = false;
+
+    try {
+      const ButtonSet = require("../models/ButtonSet");
+      const { Op } = require("sequelize");
+
+      // Determine trigger context
+      const isFirstMessage = history.length <= 2; // user + assistant = 2
+      const isLowConfidence = aggConfidence !== null && aggConfidence < 0.65;
+
+      // Build trigger query — priority: WELCOME > KEYWORD > FALLBACK
+      let triggerWhere = { connectionId, active: true };
+
+      if (isFirstMessage) {
+        triggerWhere.triggerType = { [Op.in]: ['WELCOME', 'KEYWORD', 'FALLBACK'] };
+      } else {
+        triggerWhere.triggerType = { [Op.in]: ['KEYWORD', 'FALLBACK'] };
+      }
+
+      const buttonSets = await ButtonSet.findAll({
+        where: triggerWhere,
+        order: [['triggerType', 'ASC']] // FALLBACK < KEYWORD < WELCOME alphabetically
+      });
+
+      let matched = null;
+
+      for (const set of buttonSets) {
+        if (set.triggerType === 'WELCOME' && isFirstMessage) {
+          matched = set;
+          break; // WELCOME has highest priority on first message
+        }
+        if (set.triggerType === 'KEYWORD' && set.triggerValue) {
+          const keywords = set.triggerValue.toLowerCase().split(',').map(k => k.trim());
+          const msgLower = message.toLowerCase();
+          if (keywords.some(kw => msgLower.includes(kw))) {
+            matched = set;
+            break;
+          }
+        }
+        if (set.triggerType === 'FALLBACK' && isLowConfidence && !matched) {
+          matched = set;
+        }
+      }
+
+      if (matched) {
+        matchedButtons = matched.buttons || [];
+        isQuickReply = matched.isQuickReply || false;
+      }
+    } catch (btnErr) {
+      console.error("[BUTTONS] Trigger matching error:", btnErr.message);
+    }
+
+    // Build response
+    const response = {
+      messages: [{ role: "assistant", text: aiReply }],
+      suggestions: [],
+      ai_metadata: aiMetadata
+    };
+
+    if (matchedButtons.length > 0) {
+      response.buttons = matchedButtons;
+      response.buttonsQuickReply = isQuickReply;
+    }
+
+    return res.status(200).json(response);
 
   } catch (error) {
-    console.error("❌ Chat Error:", error);
+    console.error("Chat Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-exports.submitFeedback = async (req, res) => {
-  try {
-    const { sessionId, messageIndex, rating, notes } = req.body; // rating: "CORRECT" | "INCORRECT"
-
-    if (!sessionId || messageIndex === undefined) {
-      return res.status(400).json({ error: "Missing sessionId or messageIndex" });
-    }
-
-    const session = await ChatSession.findOne({ where: { sessionId } });
-    if (!session) return res.status(404).json({ error: "Session not found" });
-
-    // Validate Messages
-    let messages = session.messages || [];
-    if (typeof messages === 'string') try { messages = JSON.parse(messages); } catch (e) { messages = []; }
-
-    const idx = parseInt(messageIndex);
-    if (isNaN(idx) || idx < 0 || idx >= messages.length) {
-      return res.status(400).json({ error: "Invalid message index" });
-    }
-
-    const targetMsg = messages[idx];
-    if (targetMsg.role !== 'assistant') {
-      return res.status(400).json({ error: "Can only rate assistant messages" });
-    }
-
-    // 1. Update Message with Feedback
-    targetMsg.feedback = {
-      rating,
-      notes,
-      createdAt: new Date()
-    };
-
-    messages[idx] = targetMsg;
-    session.messages = messages;
-    session.changed('messages', true);
-    await session.save();
-
-    // 2. Adjust Intelligence (Confidence Score)
-    // Only if rating provided
-    if (rating && targetMsg.ai_metadata && targetMsg.ai_metadata.sources) {
-      for (const source of targetMsg.ai_metadata.sources) {
-        if (source.sourceId) {
-          const knowledge = await ConnectionKnowledge.findByPk(source.sourceId);
-          if (knowledge) {
-            let score = knowledge.confidenceScore || 0.5;
-
-            if (rating === 'CORRECT') {
-              score = Math.min(score + 0.1, 1.0); // Boost
-            } else if (rating === 'INCORRECT') {
-              score = Math.max(score - 0.2, 0.0); // Penalize harder
-            }
-
-            knowledge.confidenceScore = score;
-            await knowledge.save();
-          }
-        }
-      }
-    }
-
-    res.json({ success: true, message: "Feedback received" });
-
-  } catch (error) {
-    console.error("Feedback Error:", error);
-    res.status(500).json({ error: error.message });
-  }
+// ===============================
+// Export
+// ===============================
+module.exports = {
+  handleChat,
+  sendMessage
 };

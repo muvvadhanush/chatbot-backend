@@ -22,6 +22,7 @@ console.log(`🚦 Environment: ${env.toUpperCase()}`);
 const settings = {
     env,
     port: process.env.PORT || 5000,
+    jwtSecret: process.env.JWT_SECRET || "dev_secret_key_change_in_prod",
 
     // 2. Database Config (Delegated to Sequelize)
     db: {
@@ -52,7 +53,7 @@ const settings = {
     rateLimits: {
         widget: {
             chat: { windowMs: 60 * 1000, max: 60 }, // 60 per min
-            extraction: { windowMs: 24 * 60 * 60 * 1000, max: 5 }, // 5 per day
+            extraction: { windowMs: 24 * 60 * 60 * 1000, max: 50 }, // 50 per day (Increased for testing)
         },
         admin: {
             actions: { windowMs: 60 * 1000, max: 30 }, // 30 per min
@@ -68,7 +69,21 @@ const settings = {
         development: 'verbose',
         staging: 'info',
         production: 'warn'
-    }[env]
+    }[env],
+
+    // 6. CORS Configuration
+    allowedOrigins: process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(',')
+        : [
+            'http://localhost:3000',
+            'http://localhost:5000',
+            'http://localhost:5001',
+            'http://localhost:5173',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:5000',
+            'http://127.0.0.1:5001',
+            'http://127.0.0.1:5173'
+        ]
 };
 
 // Log Configuration (Sanitized)

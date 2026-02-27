@@ -11,6 +11,8 @@ const errorHandler = (err, req, res, next) => {
         method: req.method
     });
 
+    console.error(`System Error [${requestId}]:`, err.message);
+
     // Default to 500
     let statusCode = err.status || 500;
     let errorCode = err.code || "INTERNAL_SERVER_ERROR";

@@ -1,49 +1,94 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const limiters = require("../../middleware/rateLimiter");
 
+// ===== Route Imports =====
 const chatRoutes = require("../chatRoutes");
-const connectionRoutes = require("../connectionRoutes"); // Connection mgmt & extraction
 const widgetRoutes = require("../widgetRoutes");
+const authRoutes = require("../authRoutes");
 const adminRoutes = require("../adminRoutes");
-// const ideaRoutes = require("../ideaRoutes"); // Removed
+const analyticsRoutes = require("../analyticsRoutes");
 
-// 1. Widget / Public Routes (High Volume)
-// Apply Chat Rate Limit to Chat & Widget endpoints
-router.use("/chat", limiters.widgetChat, chatRoutes);
-router.use("/widget", limiters.widgetChat, widgetRoutes); // Widget loads, etc.
-
-// 2. Admin Routes (Sensitive)
-router.use("/admin", limiters.adminActions, adminRoutes);
-
-// 3. Ideas Removed
-
-// 4. Connection Management (Mixed)
-// Some endpoints are admin (listing), some are widget (extraction)
-// We'll apply a baseline limit here, and specific limits inside the router if needed.
-// actually connectionRoutes has mixed auth.
-// Let's not apply a blanket limit here, but let the specific routes handle it or apply a generous one.
-// For now, let's leave connectionRoutes without a router-level limit and rely on internal logic + specific extraction limit.
+// Connection Submodules
+const connectionRoutes = require("../connectionRoutes");
 const discoveryRoutes = require("../discoveryRoutes");
-router.use("/connections", connectionRoutes);
-router.use("/connections", discoveryRoutes); // Discovery endpoints (/:id/discovery)
-
 const extractionRoutes = require("../extractionRoutes");
-router.use("/connections", extractionRoutes); // Extraction endpoints (/:id/extract, /upload)
-
-const brandRoutes = require("../brandRoutes");
-router.use("/connections", brandRoutes); // Brand detection (/:id/detect-brand, /brand-profile)
-
-const coverageRoutes = require("../coverageRoutes");
-router.use("/connections", coverageRoutes); // Coverage (/:id/coverage, /recalculate-coverage)
-
-const behaviorRoutes = require("../behaviorRoutes");
-router.use("/connections", behaviorRoutes); // Behavior (/:id/behavior-metrics, /behavior-suggestions)
-
-const brandDriftRoutes = require("../brandDriftRoutes");
-router.use("/connections", brandDriftRoutes); // Brand Drift (/:id/check-brand-drift, /brand-drift, /reanalyze-brand)
-
 const confidencePolicyRoutes = require("../confidencePolicyRoutes");
-router.use("/connections", confidencePolicyRoutes); // Confidence (/:id/confidence-policy)
+
+// Button System
+const buttonRoutes = require("../buttonRoutes");
+
+// Onboarding State Machine
+const onboardingRoutes = require("../onboardingRoutes");
+
+// ===================================================
+// 1️⃣ Public Widget & Chat (High Volume)
+// ===================================================
+router.use(
+  "/chat",
+  limiters.widgetChat,
+  chatRoutes
+);
+
+router.use(
+  "/widget",
+  limiters.widgetChat,
+  widgetRoutes
+);
+
+// ===================================================
+// 2️⃣ Admin & Auth (Sensitive)
+// ===================================================
+router.use(
+  "/auth",
+  limiters.adminActions,
+  authRoutes
+);
+
+router.use(
+  "/admin",
+  limiters.adminActions,
+  adminRoutes
+);
+
+router.use(
+  "/admin",
+  limiters.adminActions,
+  buttonRoutes
+);
+
+router.use(
+  "/analytics",
+  limiters.adminActions,
+  analyticsRoutes
+);
+
+// ===================================================
+// 3️⃣ Connection Scoped Router
+// ===================================================
+
+// Create scoped router for all connection-related endpoints
+const connectionsRouter = express.Router();
+
+// Optional: apply baseline limiter to all connection routes
+connectionsRouter.use(limiters.connectionBaseline || ((req, res, next) => next()));
+
+// Mount submodules
+connectionsRouter.use("/", connectionRoutes);
+connectionsRouter.use("/", discoveryRoutes);
+connectionsRouter.use("/", extractionRoutes);
+connectionsRouter.use("/", confidencePolicyRoutes);
+
+// Mount under /connections
+router.use("/connections", connectionsRouter);
+
+// ===================================================
+// 4️⃣ Onboarding State Machine
+// ===================================================
+router.use(
+  "/onboarding",
+  limiters.adminActions,
+  onboardingRoutes
+);
 
 module.exports = router;

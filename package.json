@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
+    "start:prod": "pm2 start ecosystem.config.js --env production",
     "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -13,13 +14,15 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "axios": "^1.13.4",
+    "@supabase/supabase-js": "^2.95.3",
+    "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "mammoth": "^1.11.0",
     "multer": "^2.0.2",
     "openai": "^6.16.0",
@@ -27,6 +30,8 @@
     "pdf-parse": "^2.4.5",
     "pg": "^8.18.0",
     "pg-hstore": "^2.3.4",
+    "playwright": "^1.58.2",
+    "redis": "^5.10.0",
     "sequelize": "^6.37.7",
     "uuid": "^13.0.0",
     "winston": "^3.19.0",

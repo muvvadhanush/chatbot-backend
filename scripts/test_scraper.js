@@ -1,18 +1,10 @@
-const dns = require('dns');
-try { dns.setDefaultResultOrder('ipv4first'); } catch (e) { }
+const scraperService = require('../services/scraperService');
 
-const scraperService = require("../services/scraperService");
-
-async function test() {
-    try {
-        console.log("Testing scraper...");
-        const result = await scraperService.ingestURL("http://example.com");
-        console.log("Raw Length:", result.rawText.length);
-        console.log("Cleaned:", result.cleanedText);
-        console.log("Cleaned Length:", result.cleanedText.length);
-    } catch (e) {
-        console.error("Error:", e);
-    }
+async function testScrape() {
+    const url = 'https://techbprojects.vercel.app/';
+    console.log(`Testing scrape for ${url}...`);
+    const result = await scraperService.scrapeWebsite(url);
+    console.log('Result:', JSON.stringify(result, null, 2));
 }
 
-test();
+testScrape();

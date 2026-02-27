@@ -3,6 +3,7 @@ const router = express.Router();
 const Connection = require("../models/Connection");
 const ConnectionKnowledge = require("../models/ConnectionKnowledge");
 const bcrypt = require("bcryptjs"); // Use bcryptjs
+const StateMachine = require("../services/OnboardingStateMachine");
 
 // 1.2 Widget Handshake
 router.post("/hello", async (req, res) => {
@@ -13,6 +14,7 @@ router.post("/hello", async (req, res) => {
 
         const connection = await Connection.findOne({ where: { connectionId } });
         if (!connection) {
+            console.warn(`⚠️ [WIDGET] Handshake failed: Connection ${connectionId} not found in DB.`);
             return res.status(404).json({ error: "Connection not found" });
         }
 
@@ -24,16 +26,36 @@ router.post("/hello", async (req, res) => {
             }
         }
 
-        // Update Status
-        connection.status = "CONNECTED";
-        connection.widgetSeen = true;
-        // Optionally store last seen origin if we add that field later
+        // Transition DRAFT → CONNECTED via state machine (if still in DRAFT)
+        if (connection.status === 'DRAFT') {
+            // Set websiteUrl from origin if not already set
+            if (origin && !connection.websiteUrl) {
+                await connection.update({ websiteUrl: origin });
+            }
 
+            const result = await StateMachine.transition(connection, 'CONNECTED', {
+                expectedVersion: connection.version,
+                meta: {
+                    handshakeOrigin: origin || 'unknown',
+                    handshakeAt: new Date().toISOString(),
+                    pageTitle: pageTitle || null
+                }
+            });
+
+            if (!result.success) {
+                console.warn(`⚠️ [WIDGET] Handshake transition failed: ${result.error}`);
+                // Don't block the widget — it can still operate, just log the issue
+            }
+        }
+
+        // Update last activity
+        connection.lastActivityAt = new Date();
         await connection.save();
 
         res.json({
             ok: true,
-            extractionAllowed: connection.extractionEnabled
+            extractionAllowed: connection.extractionEnabled,
+            config: connection.widgetConfig || {} // Send config to widget
         });
 
     } catch (error) {
